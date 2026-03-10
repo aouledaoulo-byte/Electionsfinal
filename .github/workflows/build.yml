@@ -8,36 +8,138 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.22.0'
+          channel: 'stable'
 
-      - name: Restructure files into Flutter project
+      - name: Create Flutter structure
         run: |
-          mkdir -p lib/screens/agent lib/screens/superviseur lib/models lib/services lib/utils android/app/src/main
-          mv pubspec.yaml . 2>/dev/null || true
-          mv main.dart lib/ 2>/dev/null || true
-          mv constants.dart lib/utils/ 2>/dev/null || true
-          mv models.dart lib/models/ 2>/dev/null || true
-          mv services.dart lib/services/ 2>/dev/null || true
-          mv login_screen.dart lib/screens/ 2>/dev/null || true
-          mv agent_home.dart lib/screens/agent/ 2>/dev/null || true
-          mv agent_bureau_detail.dart lib/screens/agent/ 2>/dev/null || true
-          mv superviseur_home.dart lib/screens/superviseur/ 2>/dev/null || true
-          mv dashboard_national.dart lib/screens/superviseur/ 2>/dev/null || true
-          mv dashboard_live.dart lib/screens/superviseur/ 2>/dev/null || true
-          mv AndroidManifest.xml android/app/src/main/ 2>/dev/null || true
+          mkdir -p lib/screens/agent lib/screens/superviseur lib/models lib/services lib/utils
+          mkdir -p android/app/src/main/res/values
+          mkdir -p android/app/src/main/kotlin/com/ynet/election
           mkdir -p assets/images
+          [ -f main.dart ] && mv main.dart lib/
+          [ -f constants.dart ] && mv constants.dart lib/utils/
+          [ -f models.dart ] && mv models.dart lib/models/
+          [ -f services.dart ] && mv services.dart lib/services/
+          [ -f login_screen.dart ] && mv login_screen.dart lib/screens/
+          [ -f agent_home.dart ] && mv agent_home.dart lib/screens/agent/
+          [ -f agent_bureau_detail.dart ] && mv agent_bureau_detail.dart lib/screens/agent/
+          [ -f superviseur_home.dart ] && mv superviseur_home.dart lib/screens/superviseur/
+          [ -f dashboard_national.dart ] && mv dashboard_national.dart lib/screens/superviseur/
+          [ -f dashboard_live.dart ] && mv dashboard_live.dart lib/screens/superviseur/
+          [ -f AndroidManifest.xml ] && mv AndroidManifest.xml android/app/src/main/
+          cat > android/app/src/main/res/values/strings.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><string name="app_name">ELECTION</string></resources>
+          EOF
+          cat > android/app/src/main/res/values/styles.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+              <item name="android:windowBackground">@android:color/white</item>
+            </style>
+            <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+              <item name="android:windowBackground">?android:colorBackground</item>
+            </style>
+          </resources>
+          EOF
+          cat > android/app/src/main/kotlin/com/ynet/election/MainActivity.kt << 'EOF'
+          package com.ynet.election
+          import io.flutter.embedding.android.FlutterActivity
+          class MainActivity: FlutterActivity()
+          EOF
 
-      - name: Get dependencies
+      - name: Create Gradle files
+        run: |
+          cat > android/build.gradle << 'EOF'
+          buildscript {
+            ext.kotlin_version = '1.9.0'
+            repositories { google(); mavenCentral() }
+            dependencies {
+              classpath 'com.android.tools.build:gradle:8.1.0'
+              classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+            }
+          }
+          allprojects { repositories { google(); mavenCentral() } }
+          rootProject.buildDir = '../build'
+          subprojects { project.buildDir = "${rootProject.buildDir}/${project.name}" }
+          subprojects { project.evaluationDependsOn(':app') }
+          tasks.register("clean", Delete) { delete rootProject.buildDir }
+          EOF
+          cat > android/settings.gradle << 'EOF'
+          include ':app'
+          def flutterProjectRoot = rootProject.projectDir.parentFile.toPath()
+          def plugins = new Properties()
+          def pluginsFile = new File(flutterProjectRoot.toFile(), '.flutter-plugins')
+          if (pluginsFile.exists()) {
+            pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) }
+          }
+          plugins.each { name, path ->
+            def pluginDirectory = flutterProjectRoot.resolve(path).resolve('android').toFile()
+            include ":$name"
+            project(":$name").projectDir = pluginDirectory
+          }
+          EOF
+          cat > android/gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=2G
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+          cat > android/app/build.gradle << 'EOF'
+          def localProperties = new Properties()
+          def localPropertiesFile = rootProject.file('local.properties')
+          if (localPropertiesFile.exists()) {
+            localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) }
+          }
+          def flutterRoot = localProperties.getProperty('flutter.sdk')
+          if (flutterRoot == null) { throw new GradleException("Flutter SDK not found.") }
+          def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
+          def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
+          apply plugin: 'com.android.application'
+          apply plugin: 'kotlin-android'
+          apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
+          android {
+            namespace "com.ynet.election"
+            compileSdkVersion 34
+            ndkVersion flutter.ndkVersion
+            compileOptions {
+              sourceCompatibility JavaVersion.VERSION_1_8
+              targetCompatibility JavaVersion.VERSION_1_8
+            }
+            kotlinOptions { jvmTarget = '1.8' }
+            sourceSets { main.java.srcDirs += 'src/main/kotlin' }
+            defaultConfig {
+              applicationId "com.ynet.election"
+              minSdkVersion 21
+              targetSdkVersion 34
+              versionCode flutterVersionCode.toInteger()
+              versionName flutterVersionName
+            }
+            buildTypes {
+              release { signingConfig signingConfigs.debug }
+            }
+          }
+          flutter { source '../..' }
+          dependencies {
+            implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+          }
+          EOF
+
+      - name: Get Flutter dependencies
         run: flutter pub get
 
       - name: Build APK
@@ -48,3 +150,4 @@ jobs:
         with:
           name: election-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
