@@ -894,6 +894,63 @@ jobs:
           }
           EOF
 
+      - name: Create app icons
+        run: |
+          sudo apt-get install -y imagemagick 2>/dev/null || true
+          for size in 48 72 96 144 192; do
+            case $size in
+              48) folder="mdpi" ;;
+              72) folder="hdpi" ;;
+              96) folder="xhdpi" ;;
+              144) folder="xxhdpi" ;;
+              192) folder="xxxhdpi" ;;
+            esac
+            mkdir -p android/app/src/main/res/mipmap-$folder
+            convert -size ${size}x${size} xc:#1B5E20 \
+              -fill white -draw "circle $((size/2)),$((size/2)) $((size/2)),$((size/4))" \
+              android/app/src/main/res/mipmap-$folder/ic_launcher.png 2>/dev/null || \
+            python3 -c "
+          from PIL import Image, ImageDraw
+          img = Image.new('RGB', ($size, $size), '#1B5E20')
+          d = ImageDraw.Draw(img)
+          d.ellipse([${size}//4, ${size}//4, 3*${size}//4, 3*${size}//4], fill='white')
+          img.save('android/app/src/main/res/mipmap-$folder/ic_launcher.png')
+          " 2>/dev/null || \
+            python3 << 'PYEOF'
+          import struct, zlib, os
+          def make_png(size, bg=(27,94,32), fg=(255,255,255)):
+              def png_chunk(name, data):
+                  c = zlib.crc32(name + data) & 0xffffffff
+                  return struct.pack('>I', len(data)) + name + data + struct.pack('>I', c)
+              pixels = []
+              cx, cy, r = size//2, size//2, size//4
+              for y in range(size):
+                  row = b'\x00'
+                  for x in range(size):
+                      if (x-cx)**2 + (y-cy)**2 <= r**2:
+                          row += bytes(fg)
+                      else:
+                          row += bytes(bg)
+                  pixels.append(row)
+              raw = b''.join(pixels)
+              compressed = zlib.compress(raw)
+              ihdr = struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0)
+              data = b'\x89PNG\r\n\x1a\n'
+              data += png_chunk(b'IHDR', ihdr)
+              data += png_chunk(b'IDAT', compressed)
+              data += png_chunk(b'IEND', b'')
+              return data
+          import sys
+          sizes = [(48,'mdpi'),(72,'hdpi'),(96,'xhdpi'),(144,'xxhdpi'),(192,'xxxhdpi')]
+          for s, folder in sizes:
+              path = f'android/app/src/main/res/mipmap-{folder}'
+              os.makedirs(path, exist_ok=True)
+              with open(f'{path}/ic_launcher.png', 'wb') as f:
+                  f.write(make_png(s))
+          print('Icons generated!')
+          PYEOF
+          done
+
       - name: Create Android files
         run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
