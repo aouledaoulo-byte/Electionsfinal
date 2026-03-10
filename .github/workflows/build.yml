@@ -25,23 +25,906 @@ jobs:
           flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Create Flutter structure
+      - name: Create full Flutter project from scratch
         run: |
           mkdir -p lib/screens/agent lib/screens/superviseur lib/models lib/services lib/utils
           mkdir -p android/app/src/main/res/values
           mkdir -p android/app/src/main/kotlin/com/ynet/election
           mkdir -p assets/images
-          [ -f main.dart ] && mv main.dart lib/
-          [ -f constants.dart ] && mv constants.dart lib/utils/
-          [ -f models.dart ] && mv models.dart lib/models/
-          [ -f services.dart ] && mv services.dart lib/services/
-          [ -f login_screen.dart ] && mv login_screen.dart lib/screens/
-          [ -f agent_home.dart ] && mv agent_home.dart lib/screens/agent/
-          [ -f agent_bureau_detail.dart ] && mv agent_bureau_detail.dart lib/screens/agent/
-          [ -f superviseur_home.dart ] && mv superviseur_home.dart lib/screens/superviseur/
-          [ -f dashboard_national.dart ] && mv dashboard_national.dart lib/screens/superviseur/
-          [ -f dashboard_live.dart ] && mv dashboard_live.dart lib/screens/superviseur/
-          [ -f AndroidManifest.xml ] && mv AndroidManifest.xml android/app/src/main/
+
+          # ── constants.dart ──────────────────────────────────
+          cat > lib/utils/constants.dart << 'EOF'
+          class AppConstants {
+            static const String supabaseUrl = 'https://ktkjtcjmsuugogyejtwh.supabase.co';
+            static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0a2p0Y2ptc3V1Z29neWVqdHdoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTY3OTYsImV4cCI6MjA4ODY3Mjc5Nn0.Hu6cWispUu13a68lH8MzzAiVAePbZjqREPfFVfzed-8';
+            static const int heureOuverture = 7;
+            static const int heureFermeture = 18;
+            static const int colorVert = 0xFF1B5E20;
+            static const double seuilNulsWarning = 0.15;
+          }
+          class AppRoles {
+            static const String agent = 'agent';
+            static const String superviseurRegional = 'superviseur_regional';
+            static const String superviseurNational = 'superviseur_national';
+          }
+          class PvStatut {
+            static const String soumis = 'soumis';
+            static const String valide = 'valide';
+            static const String rejete = 'rejete';
+          }
+          EOF
+
+          # ── models.dart ──────────────────────────────────────
+          cat > lib/models/models.dart << 'EOF'
+          class Bureau {
+            final String id, code, nom, region, commune, centre;
+            final int inscrits, ordreMission, ordonnance;
+            final String? agentId;
+            Bureau({required this.id, required this.code, required this.nom,
+              required this.region, required this.commune, required this.centre,
+              required this.inscrits, required this.ordreMission, required this.ordonnance,
+              this.agentId});
+            int get inscritsCorriges => inscrits + ordreMission + ordonnance;
+            factory Bureau.fromJson(Map<String, dynamic> j) => Bureau(
+              id: j['id'], code: j['code'], nom: j['nom'],
+              region: j['region'], commune: j['commune'], centre: j['centre'],
+              inscrits: j['inscrits'] ?? 0, ordreMission: j['ordre_mission'] ?? 0,
+              ordonnance: j['ordonnance'] ?? 0, agentId: j['agent_id']);
+          }
+          class TurnoutSnapshot {
+            final String? id, bureauId, saisiPar, validesPar, noteRejet;
+            final int heure, votants;
+            final String statut;
+            final bool offline;
+            TurnoutSnapshot({this.id, required this.bureauId, required this.heure,
+              required this.votants, required this.statut, this.saisiPar,
+              this.validesPar, this.noteRejet, this.offline = false});
+            factory TurnoutSnapshot.fromJson(Map<String, dynamic> j) => TurnoutSnapshot(
+              id: j['id'], bureauId: j['bureau_id'], heure: j['heure'],
+              votants: j['votants'], statut: j['statut'] ?? 'soumis',
+              saisiPar: j['saisi_par'], noteRejet: j['note_rejet'],
+              offline: j['offline'] ?? false);
+            Map<String, dynamic> toJson() => {'bureau_id': bureauId, 'heure': heure,
+              'votants': votants, 'statut': statut, 'saisi_par': saisiPar};
+          }
+          class PvResult {
+            final String? id, bureauId, saisiPar, validesPar, noteRejet, photoUrl;
+            final int votants, nuls, voixA, voixB;
+            final String statut;
+            PvResult({this.id, required this.bureauId, required this.votants,
+              required this.nuls, required this.voixA, required this.voixB,
+              required this.statut, this.saisiPar, this.validesPar,
+              this.noteRejet, this.photoUrl});
+            int get exprimes => voixA + voixB;
+            double get pctA => exprimes > 0 ? voixA / exprimes * 100 : 0;
+            double get pctB => exprimes > 0 ? voixB / exprimes * 100 : 0;
+            double get pctNuls => votants > 0 ? nuls / votants * 100 : 0;
+            factory PvResult.fromJson(Map<String, dynamic> j) => PvResult(
+              id: j['id'], bureauId: j['bureau_id'], votants: j['votants'] ?? 0,
+              nuls: j['nuls'] ?? 0, voixA: j['voix_a'] ?? 0, voixB: j['voix_b'] ?? 0,
+              statut: j['statut'] ?? 'soumis', saisiPar: j['saisi_par'],
+              noteRejet: j['note_rejet'], photoUrl: j['photo_url']);
+            Map<String, dynamic> toJson() => {'bureau_id': bureauId, 'votants': votants,
+              'nuls': nuls, 'voix_a': voixA, 'voix_b': voixB, 'statut': statut,
+              'saisi_par': saisiPar, 'photo_url': photoUrl};
+          }
+          class Utilisateur {
+            final String id, codeUnique, nom, role;
+            final String? prenom, region, authId;
+            Utilisateur({required this.id, required this.codeUnique,
+              required this.nom, required this.role, this.prenom, this.region, this.authId});
+            factory Utilisateur.fromJson(Map<String, dynamic> j) => Utilisateur(
+              id: j['id'], codeUnique: j['code_unique'], nom: j['nom'],
+              role: j['role'], prenom: j['prenom'], region: j['region'], authId: j['auth_id']);
+          }
+          EOF
+
+          # ── services.dart ─────────────────────────────────────
+          cat > lib/services/services.dart << 'EOF'
+          import 'package:supabase_flutter/supabase_flutter.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import '../models/models.dart';
+
+          final _sb = Supabase.instance.client;
+
+          class AuthService {
+            Future<Utilisateur?> loginWithCode(String codeUnique) async {
+              try {
+                final res = await _sb.from('utilisateurs').select()
+                  .eq('code_unique', codeUnique).eq('actif', true).single();
+                final user = Utilisateur.fromJson(res);
+                if (_sb.auth.currentSession == null) await _sb.auth.signInAnonymously();
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('user_id', user.id);
+                await prefs.setString('user_role', user.role);
+                await prefs.setString('user_nom', user.nom);
+                if (user.region != null) await prefs.setString('user_region', user.region!);
+                return user;
+              } catch (e) { return null; }
+            }
+            Future<String?> getUserRole() async {
+              final p = await SharedPreferences.getInstance();
+              return p.getString('user_role');
+            }
+            Future<String?> getUserId() async {
+              final p = await SharedPreferences.getInstance();
+              return p.getString('user_id');
+            }
+            Future<String?> getUserNom() async {
+              final p = await SharedPreferences.getInstance();
+              return p.getString('user_nom');
+            }
+            Future<void> logout() async {
+              await _sb.auth.signOut();
+              final p = await SharedPreferences.getInstance();
+              await p.clear();
+            }
+          }
+
+          class DataService {
+            Future<List<Bureau>> getBureauxAgent(String agentId) async {
+              final res = await _sb.from('bureaux').select().eq('agent_id', agentId).eq('actif', true);
+              return (res as List).map((j) => Bureau.fromJson(j)).toList();
+            }
+            Future<List<Bureau>> getBureauxRegion(String region) async {
+              final res = await _sb.from('bureaux').select().eq('region', region).eq('actif', true);
+              return (res as List).map((j) => Bureau.fromJson(j)).toList();
+            }
+            Future<List<Bureau>> getAllBureaux() async {
+              final res = await _sb.from('bureaux').select().eq('actif', true).order('region');
+              return (res as List).map((j) => Bureau.fromJson(j)).toList();
+            }
+            Future<List<TurnoutSnapshot>> getSnapshotsBureau(String bureauId) async {
+              final res = await _sb.from('turnout_snapshots').select()
+                .eq('bureau_id', bureauId).order('heure');
+              return (res as List).map((j) => TurnoutSnapshot.fromJson(j)).toList();
+            }
+            Future<bool> submitSnapshot({required String bureauId, required int heure,
+              required int votants, required String saisiPar}) async {
+              try {
+                await _sb.from('turnout_snapshots').upsert({'bureau_id': bureauId,
+                  'heure': heure, 'votants': votants, 'saisi_par': saisiPar,
+                  'statut': 'soumis'}, onConflict: 'bureau_id,heure');
+                return true;
+              } catch (e) { return false; }
+            }
+            Future<PvResult?> getPvBureau(String bureauId) async {
+              try {
+                final res = await _sb.from('pv_results').select().eq('bureau_id', bureauId).single();
+                return PvResult.fromJson(res);
+              } catch (_) { return null; }
+            }
+            Future<List<PvResult>> getAllPv() async {
+              final res = await _sb.from('pv_results').select();
+              return (res as List).map((j) => PvResult.fromJson(j)).toList();
+            }
+            Future<bool> submitPv({required String bureauId, required int votants,
+              required int nuls, required int voixA, required int voixB,
+              required String saisiPar, String? photoUrl}) async {
+              try {
+                await _sb.from('pv_results').upsert({'bureau_id': bureauId,
+                  'votants': votants, 'nuls': nuls, 'voix_a': voixA, 'voix_b': voixB,
+                  'saisi_par': saisiPar, 'photo_url': photoUrl, 'statut': 'soumis'},
+                  onConflict: 'bureau_id');
+                return true;
+              } catch (e) { return false; }
+            }
+            Future<bool> validerPv(String pvId, String validesPar) async {
+              try {
+                await _sb.from('pv_results').update({'statut': 'valide', 'valide_par': validesPar}).eq('id', pvId);
+                return true;
+              } catch (e) { return false; }
+            }
+            Future<bool> rejeterPv(String pvId, String noteRejet, String validesPar) async {
+              try {
+                await _sb.from('pv_results').update({'statut': 'rejete',
+                  'note_rejet': noteRejet, 'valide_par': validesPar}).eq('id', pvId);
+                return true;
+              } catch (e) { return false; }
+            }
+            Future<Map<String, dynamic>?> getKpiNational() async {
+              try { return await _sb.from('kpi_pv_national').select().single(); }
+              catch (_) { return null; }
+            }
+            Future<List<Map<String, dynamic>>> getKpiByRegion() async {
+              final res = await _sb.from('kpi_pv_by_region').select().order('region');
+              return List<Map<String, dynamic>>.from(res);
+            }
+            Future<List<Map<String, dynamic>>> getLiveCoverage() async {
+              final res = await _sb.from('kpi_live_coverage_by_hour').select().order('heure');
+              return List<Map<String, dynamic>>.from(res);
+            }
+            Future<List<Map<String, dynamic>>> getAnomalies() async {
+              final res = await _sb.from('v_audit_pv_anomalies').select().neq('niveau_anomalie', 'OK');
+              return List<Map<String, dynamic>>.from(res);
+            }
+            Future<String?> uploadPhotoPv(String bureauId, List<int> bytes) async {
+              try {
+                final path = 'pv/$bureauId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                await _sb.storage.from('pv-photos').uploadBinary(path, Uint8List.fromList(bytes));
+                return _sb.storage.from('pv-photos').getPublicUrl(path);
+              } catch (_) { return null; }
+            }
+          }
+          EOF
+
+          # Add Uint8List import to services.dart
+          sed -i '1s/^/import "dart:typed_data";\n/' lib/services/services.dart
+
+      - name: Create screen files
+        run: |
+          # ── login_screen.dart ────────────────────────────────
+          cat > lib/screens/login_screen.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import '../services/services.dart';
+          import '../utils/constants.dart';
+          import 'agent/agent_home.dart';
+          import 'superviseur/superviseur_home.dart';
+
+          class LoginScreen extends StatefulWidget {
+            const LoginScreen({super.key});
+            @override State<LoginScreen> createState() => _LoginScreenState();
+          }
+          class _LoginScreenState extends State<LoginScreen> {
+            final _codeCtrl = TextEditingController();
+            bool _loading = false;
+            String? _erreur;
+            Future<void> _login() async {
+              final code = _codeCtrl.text.trim().toUpperCase();
+              if (code.isEmpty) { setState(() => _erreur = 'Veuillez saisir votre code'); return; }
+              setState(() { _loading = true; _erreur = null; });
+              final user = await AuthService().loginWithCode(code);
+              if (!mounted) return;
+              setState(() => _loading = false);
+              if (user == null) { setState(() => _erreur = 'Code invalide ou compte inactif'); return; }
+              if (user.role == AppRoles.agent) {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AgentHome()));
+              } else {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SuperviseurHome()));
+              }
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                backgroundColor: const Color(0xFF1B5E20),
+                body: SafeArea(child: Center(child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    const Icon(Icons.how_to_vote, size: 80, color: Colors.white),
+                    const SizedBox(height: 16),
+                    const Text('ELECTION', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4)),
+                    const SizedBox(height: 40),
+                    Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(children: [
+                      const Text('Connexion', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 20),
+                      TextField(controller: _codeCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: InputDecoration(labelText: 'Code unique',
+                          hintText: 'Ex: AGENT-001', prefixIcon: const Icon(Icons.vpn_key),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                          errorText: _erreur)),
+                      const SizedBox(height: 20),
+                      _loading ? const CircularProgressIndicator()
+                        : ElevatedButton.icon(onPressed: _login,
+                            icon: const Icon(Icons.login),
+                            label: const Text('Se connecter', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20),
+                              foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 52))),
+                    ]))),
+                  ]),
+                ))),
+              );
+            }
+          }
+          EOF
+
+          # ── agent_home.dart ──────────────────────────────────
+          cat > lib/screens/agent/agent_home.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+          import '../../models/models.dart';
+          import '../login_screen.dart';
+          import 'agent_bureau_detail.dart';
+
+          class AgentHome extends StatefulWidget {
+            const AgentHome({super.key});
+            @override State<AgentHome> createState() => _AgentHomeState();
+          }
+          class _AgentHomeState extends State<AgentHome> {
+            final _data = DataService();
+            List<Bureau> _bureaux = [];
+            bool _loading = true;
+            String _nomAgent = '', _agentId = '';
+
+            @override void initState() { super.initState(); _init(); }
+
+            Future<void> _init() async {
+              _nomAgent = await AuthService().getUserNom() ?? '';
+              _agentId = await AuthService().getUserId() ?? '';
+              await _charger();
+            }
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final b = await _data.getBureauxAgent(_agentId);
+                setState(() { _bureaux = b; _loading = false; });
+              } catch (_) { setState(() => _loading = false); }
+            }
+            Future<void> _logout() async {
+              await AuthService().logout();
+              if (!mounted) return;
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Mes Bureaux'),
+                  backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
+                  actions: [IconButton(icon: const Icon(Icons.logout), onPressed: _logout)]),
+                body: Column(children: [
+                  Container(color: const Color(0xFF1B5E20), padding: const EdgeInsets.fromLTRB(16,0,16,16),
+                    child: Row(children: [
+                      const CircleAvatar(backgroundColor: Colors.white24, child: Icon(Icons.person, color: Colors.white)),
+                      const SizedBox(width: 12),
+                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('Agent terrain', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                        Text(_nomAgent, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ]),
+                    ])),
+                  Expanded(child: _loading ? const Center(child: CircularProgressIndicator())
+                    : RefreshIndicator(onRefresh: _charger,
+                        child: ListView.builder(padding: const EdgeInsets.all(12),
+                          itemCount: _bureaux.length,
+                          itemBuilder: (_, i) {
+                            final b = _bureaux[i];
+                            return Card(margin: const EdgeInsets.only(bottom: 10),
+                              child: ListTile(
+                                leading: const Icon(Icons.ballot, color: Color(0xFF1B5E20)),
+                                title: Text(b.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                subtitle: Text('${b.region} · ${b.commune} · Inscrits: ${b.inscritsCorriges}'),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.push(context, MaterialPageRoute(
+                                  builder: (_) => AgentBureauDetail(bureau: b, agentId: _agentId)))));
+                          }))),
+                ]));
+            }
+          }
+          EOF
+
+          # ── agent_bureau_detail.dart (simplified) ────────────
+          cat > lib/screens/agent/agent_bureau_detail.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import '../../models/models.dart';
+          import '../../services/services.dart';
+          import '../../utils/constants.dart';
+
+          class AgentBureauDetail extends StatefulWidget {
+            final Bureau bureau;
+            final String agentId;
+            const AgentBureauDetail({super.key, required this.bureau, required this.agentId});
+            @override State<AgentBureauDetail> createState() => _AgentBureauDetailState();
+          }
+          class _AgentBureauDetailState extends State<AgentBureauDetail> with SingleTickerProviderStateMixin {
+            late TabController _tabs;
+            final _data = DataService();
+            List<TurnoutSnapshot> _snapshots = [];
+            PvResult? _pv;
+            bool _loading = true;
+
+            @override void initState() { super.initState(); _tabs = TabController(length: 2, vsync: this); _charger(); }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              final s = await _data.getSnapshotsBureau(widget.bureau.id);
+              final p = await _data.getPvBureau(widget.bureau.id);
+              setState(() { _snapshots = s; _pv = p; _loading = false; });
+            }
+
+            int get _heureActuelle => DateTime.now().hour.clamp(AppConstants.heureOuverture, AppConstants.heureFermeture);
+            bool get _releveDejaSaisi => _snapshots.any((s) => s.heure == _heureActuelle);
+
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: Text(widget.bureau.nom),
+                  backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
+                  bottom: TabBar(controller: _tabs, labelColor: Colors.white, unselectedLabelColor: Colors.white60,
+                    indicatorColor: Colors.white,
+                    tabs: const [Tab(icon: Icon(Icons.access_time), text: 'Relevé LIVE'),
+                      Tab(icon: Icon(Icons.assignment), text: 'PV Final')])),
+                body: _loading ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(controller: _tabs, children: [_tabLive(), _tabPv()]));
+            }
+
+            Widget _tabLive() {
+              final cVotants = TextEditingController();
+              return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
+                Card(color: const Color(0xFFE8F5E9), child: Padding(padding: const EdgeInsets.all(14),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                    _kpi('Inscrits', widget.bureau.inscrits.toString()),
+                    _kpi('Corrigés', widget.bureau.inscritsCorriges.toString(), bold: true),
+                  ]))),
+                const SizedBox(height: 12),
+                if (!_releveDejaSaisi) Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+                  Text('Relevé ${_heureActuelle}h', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 12),
+                  TextField(controller: cVotants, keyboardType: TextInputType.number,
+                    decoration: InputDecoration(labelText: 'Nombre de votants',
+                      suffixText: '/ ${widget.bureau.inscritsCorriges}',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
+                    onPressed: () async {
+                      final v = int.tryParse(cVotants.text);
+                      if (v == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saisissez un nombre valide'), backgroundColor: Colors.red)); return; }
+                      if (v > widget.bureau.inscritsCorriges) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Votants > Inscrits corrigés!'), backgroundColor: Colors.red)); return; }
+                      final ok = await _data.submitSnapshot(bureauId: widget.bureau.id, heure: _heureActuelle, votants: v, saisiPar: widget.agentId);
+                      if (!mounted) return;
+                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Relevé ${_heureActuelle}h transmis!'), backgroundColor: Colors.green)); _charger(); }
+                    },
+                    icon: const Icon(Icons.send), label: Text('Envoyer relevé ${_heureActuelle}h')),
+                ])))
+                else Card(color: Colors.green.shade50, child: Padding(padding: const EdgeInsets.all(12),
+                  child: Row(children: [const Icon(Icons.check_circle, color: Colors.green), const SizedBox(width: 8),
+                    Text('Relevé ${_heureActuelle}h déjà transmis', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]))),
+                const SizedBox(height: 12),
+                if (_snapshots.isNotEmpty) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Historique', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ..._snapshots.map((s) => ListTile(dense: true,
+                    leading: Text('${s.heure}h', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text('${s.votants} votants'),
+                    trailing: Icon(s.statut == 'valide' ? Icons.check_circle : s.statut == 'rejete' ? Icons.cancel : Icons.schedule,
+                      color: s.statut == 'valide' ? Colors.green : s.statut == 'rejete' ? Colors.red : Colors.orange))),
+                ]))),
+              ]));
+            }
+
+            Widget _tabPv() {
+              if (_pv?.statut == 'valide') return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.verified, color: Colors.green, size: 64),
+                const SizedBox(height: 12),
+                const Text('PV Validé ✅', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+                Text('Candidat A: ${_pv!.pctA.toStringAsFixed(1)}% | Candidat B: ${_pv!.pctB.toStringAsFixed(1)}%'),
+              ]));
+              final cV = TextEditingController(text: _pv?.votants.toString() ?? '');
+              final cN = TextEditingController(text: _pv?.nuls.toString() ?? '');
+              final cA = TextEditingController(text: _pv?.voixA.toString() ?? '');
+              final cB = TextEditingController(text: _pv?.voixB.toString() ?? '');
+              return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
+                if (_pv?.statut == 'rejete') Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(12),
+                  child: Text('❌ Rejeté: ${_pv!.noteRejet ?? ""}', style: const TextStyle(color: Colors.red)))),
+                Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+                  const Text('PV Final', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 12),
+                  _champPv('Votants', cV), _champPv('Nuls', cN),
+                  _champPv('Voix Candidat A', cA), _champPv('Voix Candidat B', cB),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
+                    onPressed: () async {
+                      final v = int.tryParse(cV.text), n = int.tryParse(cN.text), a = int.tryParse(cA.text), b = int.tryParse(cB.text);
+                      if (v == null || n == null || a == null || b == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Remplissez tous les champs'), backgroundColor: Colors.red)); return; }
+                      if (v != n + a + b) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $v ≠ $n + $a + $b'), backgroundColor: Colors.red)); return; }
+                      final ok = await _data.submitPv(bureauId: widget.bureau.id, votants: v, nuls: n, voixA: a, voixB: b, saisiPar: widget.agentId);
+                      if (!mounted) return;
+                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV transmis!'), backgroundColor: Colors.green)); _charger(); }
+                    },
+                    icon: const Icon(Icons.send), label: const Text('Soumettre le PV')),
+                ]))),
+              ]));
+            }
+
+            Widget _kpi(String l, String v, {bool bold = false}) => Column(children: [
+              Text(v, style: TextStyle(fontSize: bold ? 22 : 18, fontWeight: FontWeight.bold, color: bold ? const Color(0xFF1B5E20) : Colors.black87)),
+              Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey))]);
+
+            Widget _champPv(String label, TextEditingController ctrl) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(controller: ctrl, keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: label,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))));
+          }
+          EOF
+
+          # ── superviseur_home.dart ─────────────────────────────
+          cat > lib/screens/superviseur/superviseur_home.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+          import '../../utils/constants.dart';
+          import '../login_screen.dart';
+          import 'dashboard_national.dart';
+          import 'dashboard_live.dart';
+
+          class SuperviseurHome extends StatefulWidget {
+            const SuperviseurHome({super.key});
+            @override State<SuperviseurHome> createState() => _SuperviseurHomeState();
+          }
+          class _SuperviseurHomeState extends State<SuperviseurHome> {
+            int _page = 0;
+            String _nom = '', _role = '';
+            @override void initState() { super.initState(); _init(); }
+            Future<void> _init() async {
+              final a = AuthService();
+              setState(() {});
+              _nom = await a.getUserNom() ?? '';
+              _role = await a.getUserRole() ?? '';
+              setState(() {});
+            }
+            Future<void> _logout() async {
+              await AuthService().logout();
+              if (!mounted) return;
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+            }
+            @override
+            Widget build(BuildContext context) {
+              final pages = const [DashboardNational(), DashboardLive(), ValidationScreen(), AnomaliesScreen()];
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text(_role == AppRoles.superviseurNational ? 'Dashboard National' : 'Dashboard Régional'),
+                  backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
+                  actions: [Padding(padding: const EdgeInsets.only(right: 8),
+                    child: Center(child: Text(_nom, style: const TextStyle(fontSize: 13, color: Colors.white70)))),
+                    IconButton(icon: const Icon(Icons.logout), onPressed: _logout)]),
+                body: pages[_page],
+                bottomNavigationBar: NavigationBar(selectedIndex: _page,
+                  onDestinationSelected: (i) => setState(() => _page = i),
+                  destinations: const [
+                    NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Résultats'),
+                    NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
+                    NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
+                    NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies')]));
+            }
+          }
+          EOF
+
+          # Copy dashboard files from uploaded versions (they have correct content)
+          # but fix their imports
+          if [ -f dashboard_national.dart ]; then
+            mv dashboard_national.dart lib/screens/superviseur/
+          fi
+          if [ -f dashboard_live.dart ]; then
+            mv dashboard_live.dart lib/screens/superviseur/
+          fi
+
+          # Fix imports in dashboard files
+          find lib/screens/superviseur -name "*.dart" | xargs sed -i \
+            -e "s|import '../../services/auth_service.dart'|import '../../services/services.dart'|g" \
+            -e "s|import 'services/auth_service.dart'|import '../../services/services.dart'|g" \
+            -e "s|import '../../models/models.dart'||g"
+
+          # Add correct imports at top of dashboard_national.dart
+          if [ -f lib/screens/superviseur/dashboard_national.dart ]; then
+            sed -i '1s/^/import "package:flutter\/material.dart";\nimport "package:fl_chart\/fl_chart.dart";\nimport "..\/..\/services\/services.dart";\nimport "..\/..\/models\/models.dart";\n/' lib/screens/superviseur/dashboard_national.dart
+          else
+            cat > lib/screens/superviseur/dashboard_national.dart << 'EOF2'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+
+          class DashboardNational extends StatefulWidget {
+            const DashboardNational({super.key});
+            @override State<DashboardNational> createState() => _DashboardNationalState();
+          }
+          class _DashboardNationalState extends State<DashboardNational> {
+            final _data = DataService();
+            Map<String, dynamic>? _kpi;
+            List<Map<String, dynamic>> _regions = [];
+            bool _loading = true;
+            @override void initState() { super.initState(); _charger(); }
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              final kpi = await _data.getKpiNational();
+              final reg = await _data.getKpiByRegion();
+              setState(() { _kpi = kpi; _regions = reg; _loading = false; });
+            }
+            double _d(dynamic v) => (v as num?)?.toDouble() ?? 0;
+            @override
+            Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator());
+              if (_kpi == null) return const Center(child: Text('Données non disponibles'));
+              final pctA = _d(_kpi!['pct_candidat_a']);
+              final pctB = _d(_kpi!['pct_candidat_b']);
+              final taux = _d(_kpi!['taux_participation_corriges']);
+              return RefreshIndicator(onRefresh: _charger, child: SingleChildScrollView(
+                padding: const EdgeInsets.all(14),
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(children: [
+                  _kpiCard('Participation', '${taux.toStringAsFixed(1)}%', Icons.people, Colors.green),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: _kpiCard('Candidat A', '${pctA.toStringAsFixed(1)}%', Icons.how_to_vote, Colors.blue)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _kpiCard('Candidat B', '${pctB.toStringAsFixed(1)}%', Icons.how_to_vote, Colors.red)),
+                  ]),
+                  const SizedBox(height: 16),
+                  const Text('Par région', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ..._regions.map((r) => Card(margin: const EdgeInsets.only(top: 8),
+                    child: ListTile(
+                      title: Text(r['region'] ?? '—', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('A: ${_d(r["pct_a"]).toStringAsFixed(1)}% | B: ${_d(r["pct_b"]).toStringAsFixed(1)}%'),
+                      trailing: Text('${_d(r["taux_participation"]).toStringAsFixed(0)}%',
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)))))),
+                ])));
+            }
+            Widget _kpiCard(String label, String value, IconData icon, Color color) => Card(
+              color: color.withOpacity(0.08),
+              child: Padding(padding: const EdgeInsets.all(16),
+                child: Row(children: [Icon(icon, color: color, size: 32), const SizedBox(width: 12),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+                    Text(label, style: const TextStyle(color: Colors.grey))])])));
+          }
+          EOF2
+          fi
+
+          # Create dashboard_live.dart with all classes
+          cat > lib/screens/superviseur/dashboard_live.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+          import '../../models/models.dart';
+          import '../../utils/constants.dart';
+
+          class DashboardLive extends StatefulWidget {
+            const DashboardLive({super.key});
+            @override State<DashboardLive> createState() => _DashboardLiveState();
+          }
+          class _DashboardLiveState extends State<DashboardLive> {
+            final _data = DataService();
+            List<Map<String, dynamic>> _coverage = [];
+            bool _loading = true;
+            @override void initState() { super.initState(); _charger(); }
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              final c = await _data.getLiveCoverage();
+              setState(() { _coverage = c; _loading = false; });
+            }
+            @override
+            Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator());
+              return RefreshIndicator(onRefresh: _charger, child: ListView(
+                padding: const EdgeInsets.all(14),
+                children: _coverage.map((c) {
+                  final h = (c['heure'] as num).toInt();
+                  final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
+                  final total = (c['total_bureaux'] as num?)?.toInt() ?? 0;
+                  final valides = (c['bureaux_valides'] as num?)?.toInt() ?? 0;
+                  final taux = (c['taux_participation'] as num?)?.toDouble() ?? 0;
+                  final color = pct >= 80 ? Colors.green : pct >= 50 ? Colors.orange : Colors.grey;
+                  return Card(margin: const EdgeInsets.only(bottom: 8), child: Padding(
+                    padding: const EdgeInsets.all(12), child: Row(children: [
+                      CircleAvatar(backgroundColor: color.withOpacity(0.15),
+                        child: Text('${h}h', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11))),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(
+                          value: pct/100, minHeight: 8, backgroundColor: Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation(color))),
+                        const SizedBox(height: 4),
+                        Text('$valides/$total bureaux · part. ${taux.toStringAsFixed(1)}%',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey))])),
+                      const SizedBox(width: 8),
+                      Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.bold, color: color))])));
+                }).toList()));
+            }
+          }
+
+          class ValidationScreen extends StatefulWidget {
+            const ValidationScreen({super.key});
+            @override State<ValidationScreen> createState() => _ValidationScreenState();
+          }
+          class _ValidationScreenState extends State<ValidationScreen> {
+            final _data = DataService();
+            List<Map<String, dynamic>> _pvSoumis = [];
+            bool _loading = true;
+            String _superviseurId = '';
+            @override void initState() { super.initState(); _charger(); }
+            Future<void> _charger() async {
+              _superviseurId = await AuthService().getUserId() ?? '';
+              setState(() => _loading = true);
+              final pvAll = await _data.getAllPv();
+              final bAll = await _data.getAllBureaux();
+              final bureauMap = {for (var b in bAll) b.id: b};
+              final soumis = pvAll.where((p) => p.statut == PvStatut.soumis).toList();
+              setState(() {
+                _pvSoumis = soumis.map((p) => {'pv': p, 'bureau': bureauMap[p.bureauId]}).toList();
+                _loading = false;
+              });
+            }
+            @override
+            Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator());
+              if (_pvSoumis.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                children: [Icon(Icons.check_circle, size: 64, color: Colors.green), SizedBox(height: 12),
+                  Text('Aucun PV en attente', style: TextStyle(color: Colors.grey, fontSize: 16))]));
+              return ListView.builder(padding: const EdgeInsets.all(12), itemCount: _pvSoumis.length,
+                itemBuilder: (_, i) {
+                  final pv = _pvSoumis[i]['pv'] as PvResult;
+                  final b = _pvSoumis[i]['bureau'] as Bureau?;
+                  final coherent = pv.votants == pv.nuls + pv.voixA + pv.voixB;
+                  return Card(margin: const EdgeInsets.only(bottom: 10), child: Padding(
+                    padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(b?.nom ?? '—', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text('${b?.region ?? ''} · ${b?.commune ?? ''}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Divider(),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                        _stat('Votants', pv.votants), _stat('Nuls', pv.nuls),
+                        _stat('A', pv.voixA), _stat('B', pv.voixB)]),
+                      if (!coherent) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                        child: Row(children: [const Icon(Icons.warning, color: Colors.red, size: 16),
+                          const SizedBox(width: 6), Text('Incohérence: ${pv.votants} ≠ ${pv.nuls}+${pv.voixA}+${pv.voixB}',
+                            style: const TextStyle(color: Colors.red, fontSize: 12))])),
+                      const SizedBox(height: 12),
+                      Row(children: [
+                        Expanded(child: OutlinedButton.icon(
+                          onPressed: () => _rejeter(pv),
+                          icon: const Icon(Icons.cancel, color: Colors.red),
+                          label: const Text('Rejeter', style: TextStyle(color: Colors.red)),
+                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)))),
+                        const SizedBox(width: 8),
+                        Expanded(child: ElevatedButton.icon(
+                          onPressed: () => _valider(pv.id!),
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('Valider'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white)))]),
+                    ])));
+                });
+            }
+            Widget _stat(String l, int v) => Column(children: [
+              Text(v.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey))]);
+            Future<void> _valider(String pvId) async {
+              await _data.validerPv(pvId, _superviseurId);
+              if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV validé ✓'), backgroundColor: Colors.green)); _charger(); }
+            }
+            Future<void> _rejeter(PvResult pv) async {
+              String note = '';
+              final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
+                title: const Text('Rejeter le PV'),
+                content: TextField(decoration: const InputDecoration(labelText: 'Motif du rejet', border: OutlineInputBorder()),
+                  onChanged: (v) => note = v),
+                actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+                  ElevatedButton(onPressed: () => Navigator.pop(context, true),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Rejeter'))]));
+              if (ok == true && pv.id != null) {
+                await _data.rejeterPv(pv.id!, note, _superviseurId);
+                if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV rejeté'), backgroundColor: Colors.red)); _charger(); }
+              }
+            }
+          }
+
+          class AnomaliesScreen extends StatefulWidget {
+            const AnomaliesScreen({super.key});
+            @override State<AnomaliesScreen> createState() => _AnomaliesScreenState();
+          }
+          class _AnomaliesScreenState extends State<AnomaliesScreen> {
+            final _data = DataService();
+            List<Map<String, dynamic>> _anomalies = [];
+            bool _loading = true;
+            @override void initState() { super.initState(); _charger(); }
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              final a = await _data.getAnomalies();
+              setState(() { _anomalies = a; _loading = false; });
+            }
+            @override
+            Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator());
+              if (_anomalies.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+                children: [Icon(Icons.verified_user, size: 64, color: Colors.green), SizedBox(height: 12),
+                  Text('Aucune anomalie', style: TextStyle(color: Colors.grey, fontSize: 16))]));
+              return RefreshIndicator(onRefresh: _charger, child: ListView.builder(
+                padding: const EdgeInsets.all(12), itemCount: _anomalies.length,
+                itemBuilder: (_, i) {
+                  final a = _anomalies[i];
+                  final critique = a['niveau_anomalie'] == 'CRITIQUE';
+                  final color = critique ? Colors.red : Colors.orange;
+                  return Card(margin: const EdgeInsets.only(bottom: 8),
+                    shape: RoundedRectangleBorder(side: BorderSide(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(12)),
+                    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [Icon(critique ? Icons.error : Icons.warning, color: color, size: 20), const SizedBox(width: 8),
+                        Expanded(child: Text(a['nom'] ?? '—', style: const TextStyle(fontWeight: FontWeight.bold)))]),
+                      Text('${a['region']} · ${a['commune']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      const Divider(height: 12),
+                      Text(a['niveau_anomalie'] ?? '', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+                    ])));
+                }));
+            }
+          }
+          EOF
+
+          # ── main.dart ─────────────────────────────────────────
+          cat > lib/main.dart << 'EOF'
+          import 'package:flutter/material.dart';
+          import 'package:supabase_flutter/supabase_flutter.dart';
+          import 'screens/login_screen.dart';
+          import 'screens/agent/agent_home.dart';
+          import 'screens/superviseur/superviseur_home.dart';
+          import 'services/services.dart';
+          import 'utils/constants.dart';
+
+          void main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+            await Supabase.initialize(url: AppConstants.supabaseUrl, anonKey: AppConstants.supabaseAnonKey);
+            runApp(const ElectionApp());
+          }
+
+          class ElectionApp extends StatelessWidget {
+            const ElectionApp({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(title: 'ELECTION', debugShowCheckedModeBanner: false,
+                theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)), useMaterial3: true),
+                home: const SplashScreen());
+            }
+          }
+
+          class SplashScreen extends StatefulWidget {
+            const SplashScreen({super.key});
+            @override State<SplashScreen> createState() => _SplashScreenState();
+          }
+          class _SplashScreenState extends State<SplashScreen> {
+            @override void initState() { super.initState(); _check(); }
+            Future<void> _check() async {
+              await Future.delayed(const Duration(milliseconds: 800));
+              if (!mounted) return;
+              final session = Supabase.instance.client.auth.currentSession;
+              if (session != null) {
+                final role = await AuthService().getUserRole();
+                if (!mounted) return;
+                if (role == 'agent') {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AgentHome()));
+                } else {
+                  Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SuperviseurHome()));
+                }
+              } else {
+                Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+              }
+            }
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(backgroundColor: const Color(0xFF1B5E20),
+                body: const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.how_to_vote, size: 80, color: Colors.white),
+                  SizedBox(height: 16),
+                  Text('ELECTION', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 4)),
+                  SizedBox(height: 40),
+                  CircularProgressIndicator(color: Colors.white)])));
+            }
+          }
+          EOF
+
+      - name: Create Android files
+        run: |
+          cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+            <uses-permission android:name="android.permission.INTERNET"/>
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+            <uses-permission android:name="android.permission.CAMERA"/>
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+            <application android:label="ELECTION" android:name="${applicationName}" android:icon="@mipmap/ic_launcher">
+              <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop"
+                android:theme="@style/LaunchTheme"
+                android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
+                <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
+                <intent-filter android:autoVerify="true">
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+                <intent-filter android:autoVerify="true">
+                  <action android:name="android.intent.action.VIEW"/>
+                  <category android:name="android.intent.category.DEFAULT"/>
+                  <category android:name="android.intent.category.BROWSABLE"/>
+                  <data android:scheme="https" android:host="ktkjtcjmsuugogyejtwh.supabase.co"/>
+                </intent-filter>
+              </activity>
+              <meta-data android:name="flutterEmbedding" android:value="2"/>
+            </application>
+          </manifest>
+          EOF
           cat > android/app/src/main/res/values/strings.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources><string name="app_name">ELECTION</string></resources>
@@ -62,9 +945,6 @@ jobs:
           import io.flutter.embedding.android.FlutterActivity
           class MainActivity: FlutterActivity()
           EOF
-
-      - name: Create Gradle files
-        run: |
           cat > android/build.gradle << 'EOF'
           buildscript {
             ext.kotlin_version = '1.9.0'
@@ -85,9 +965,7 @@ jobs:
           def flutterProjectRoot = rootProject.projectDir.parentFile.toPath()
           def plugins = new Properties()
           def pluginsFile = new File(flutterProjectRoot.toFile(), '.flutter-plugins')
-          if (pluginsFile.exists()) {
-            pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) }
-          }
+          if (pluginsFile.exists()) { pluginsFile.withReader('UTF-8') { reader -> plugins.load(reader) } }
           plugins.each { name, path ->
             def pluginDirectory = flutterProjectRoot.resolve(path).resolve('android').toFile()
             include ":$name"
@@ -102,9 +980,7 @@ jobs:
           cat > android/app/build.gradle << 'EOF'
           def localProperties = new Properties()
           def localPropertiesFile = rootProject.file('local.properties')
-          if (localPropertiesFile.exists()) {
-            localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) }
-          }
+          if (localPropertiesFile.exists()) { localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) } }
           def flutterRoot = localProperties.getProperty('flutter.sdk')
           if (flutterRoot == null) { throw new GradleException("Flutter SDK not found.") }
           def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '1'
@@ -116,27 +992,39 @@ jobs:
             namespace "com.ynet.election"
             compileSdkVersion 34
             ndkVersion flutter.ndkVersion
-            compileOptions {
-              sourceCompatibility JavaVersion.VERSION_1_8
-              targetCompatibility JavaVersion.VERSION_1_8
-            }
+            compileOptions { sourceCompatibility JavaVersion.VERSION_1_8; targetCompatibility JavaVersion.VERSION_1_8 }
             kotlinOptions { jvmTarget = '1.8' }
             sourceSets { main.java.srcDirs += 'src/main/kotlin' }
-            defaultConfig {
-              applicationId "com.ynet.election"
-              minSdkVersion 21
-              targetSdkVersion 34
-              versionCode flutterVersionCode.toInteger()
-              versionName flutterVersionName
-            }
-            buildTypes {
-              release { signingConfig signingConfigs.debug }
-            }
+            defaultConfig { applicationId "com.ynet.election"; minSdkVersion 21; targetSdkVersion 34
+              versionCode flutterVersionCode.toInteger(); versionName flutterVersionName }
+            buildTypes { release { signingConfig signingConfigs.debug } }
           }
           flutter { source '../..' }
-          dependencies {
-            implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
-          }
+          dependencies { implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version" }
+          EOF
+
+      - name: Create pubspec.yaml
+        run: |
+          cat > pubspec.yaml << 'EOF'
+          name: election
+          description: Application de suivi electoral
+          publish_to: 'none'
+          version: 1.0.0+1
+          environment:
+            sdk: '>=3.0.0 <4.0.0'
+          dependencies:
+            flutter:
+              sdk: flutter
+            supabase_flutter: ^2.3.0
+            shared_preferences: ^2.2.2
+            connectivity_plus: ^5.0.2
+            image_picker: ^1.0.7
+            fl_chart: ^0.66.2
+            intl: ^0.19.0
+          flutter:
+            uses-material-design: true
+            assets:
+              - assets/images/
           EOF
 
       - name: Get Flutter dependencies
