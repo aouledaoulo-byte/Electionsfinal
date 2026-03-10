@@ -1,0 +1,50 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+
+      - name: Restructure files into Flutter project
+        run: |
+          mkdir -p lib/screens/agent lib/screens/superviseur lib/models lib/services lib/utils android/app/src/main
+          mv pubspec.yaml . 2>/dev/null || true
+          mv main.dart lib/ 2>/dev/null || true
+          mv constants.dart lib/utils/ 2>/dev/null || true
+          mv models.dart lib/models/ 2>/dev/null || true
+          mv services.dart lib/services/ 2>/dev/null || true
+          mv login_screen.dart lib/screens/ 2>/dev/null || true
+          mv agent_home.dart lib/screens/agent/ 2>/dev/null || true
+          mv agent_bureau_detail.dart lib/screens/agent/ 2>/dev/null || true
+          mv superviseur_home.dart lib/screens/superviseur/ 2>/dev/null || true
+          mv dashboard_national.dart lib/screens/superviseur/ 2>/dev/null || true
+          mv dashboard_live.dart lib/screens/superviseur/ 2>/dev/null || true
+          mv AndroidManifest.xml android/app/src/main/ 2>/dev/null || true
+          mkdir -p assets/images
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release --no-shrink
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: election-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
