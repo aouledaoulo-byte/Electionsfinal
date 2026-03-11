@@ -16,16 +16,22 @@ class _DashboardLiveState extends State<DashboardLive> {
   final _data = DataService();
   List<Map<String, dynamic>> _coverage = [];
   bool _loading = true;
+  String? _commune;
 
   @override
   void initState() {
     super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    _commune = await AuthService().getUserCommune();
     _charger();
   }
 
   Future<void> _charger() async {
     setState(() => _loading = true);
-    final c = await _data.getLiveCoverage();
+    final c = await _data.getLiveCoverage(commune: _commune);
     setState(() { _coverage = c; _loading = false; });
   }
 
