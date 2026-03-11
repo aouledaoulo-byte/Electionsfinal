@@ -32,7 +32,7 @@ jobs:
           mkdir -p android/app/src/main/kotlin/com/ynet/election
           mkdir -p assets/images
 
-          # ── constants.dart ──────────────────────────────────
+          # -- constants.dart ----------------------------------
           cat > lib/utils/constants.dart << 'EOF'
           class AppConstants {
             static const String supabaseUrl = 'https://ktkjtcjmsuugogyejtwh.supabase.co';
@@ -54,9 +54,9 @@ jobs:
           }
           EOF
 
-          # ── models.dart ──────────────────────────────────────
+          # -- models.dart --------------------------------------
           cat > lib/models/models.dart << 'EOF'
-          // ── Bureau ──────────────────────────────────────────────────
+          // -- Bureau --------------------------------------------------
           class Bureau {
             final String id, code, nom, region, commune, centre;
             final int inscrits, ordreMission, ordonnance;
@@ -81,7 +81,7 @@ jobs:
             );
           }
 
-          // ── TurnoutSnapshot ─────────────────────────────────────────
+          // -- TurnoutSnapshot -----------------------------------------
           class TurnoutSnapshot {
             final String? id, bureauId, saisiPar, validesPar, noteRejet;
             final int heure, votants;
@@ -111,7 +111,7 @@ jobs:
             };
           }
 
-          // ── PvResult ─────────────────────────────────────────────────
+          // -- PvResult -------------------------------------------------
           class PvResult {
             final String? id, bureauId, saisiPar, validesPar, noteRejet, photoUrl;
             final int votants, nuls, voixA, voixB;
@@ -149,7 +149,7 @@ jobs:
             };
           }
 
-          // ── Utilisateur ──────────────────────────────────────────────
+          // -- Utilisateur ----------------------------------------------
           class Utilisateur {
             final String id, codeUnique, nom, role;
             final String? prenom, region, commune, authId;
@@ -167,10 +167,9 @@ jobs:
               commune: j['commune'], authId: j['auth_id'],
             );
           }
-
           EOF
 
-          # ── services.dart ─────────────────────────────────────
+          # -- services.dart -------------------------------------
           cat > lib/services/services.dart << 'EOF'
           import 'package:supabase_flutter/supabase_flutter.dart';
           import 'package:shared_preferences/shared_preferences.dart';
@@ -186,15 +185,15 @@ jobs:
               try {
                 // Chercher l'utilisateur par code unique
                 final res = await _sb
-          .from('utilisateurs')
-          .select()
-          .eq('code_unique', codeUnique)
-          .eq('actif', true)
-          .single();
+                    .from('utilisateurs')
+                    .select()
+                    .eq('code_unique', codeUnique)
+                    .eq('actif', true)
+                    .single();
 
                 final user = Utilisateur.fromJson(res);
 
-                // Connexion anonyme liée au code unique
+                // Connexion anonyme liee au code unique
                 if (_sb.auth.currentSession == null) {
                   await _sb.auth.signInAnonymously();
                 }
@@ -244,7 +243,7 @@ jobs:
           //  SUPABASE DATA SERVICE
           // ============================================================
           class DataService {
-            // ── Bureaux ─────────────────────────────────────────────
+            // -- Bureaux ---------------------------------------------
             Future<List<Bureau>> getBureauxAgent(String agentId) async {
               final res = await _sb.from('bureaux').select().eq('agent_id', agentId).eq('actif', true);
               return (res as List).map((j) => Bureau.fromJson(j)).toList();
@@ -260,7 +259,7 @@ jobs:
               return (res as List).map((j) => Bureau.fromJson(j)).toList();
             }
 
-            // ── Turnout Snapshots ────────────────────────────────────
+            // -- Turnout Snapshots ------------------------------------
             Future<List<TurnoutSnapshot>> getSnapshotsBureau(String bureauId) async {
               final res = await _sb
                   .from('turnout_snapshots')
@@ -307,7 +306,7 @@ jobs:
               }
             }
 
-            // ── PV Results ───────────────────────────────────────────
+            // -- PV Results -------------------------------------------
             Future<PvResult?> getPvBureau(String bureauId) async {
               try {
                 final res = await _sb.from('pv_results').select().eq('bureau_id', bureauId).single();
@@ -366,7 +365,7 @@ jobs:
               }
             }
 
-            // ── Dashboards (vues Supabase) ───────────────────────────
+            // -- Dashboards (vues Supabase) ---------------------------
             Future<Map<String, dynamic>?> getKpiNational() async {
               try {
                 final res = await _sb.from('kpi_pv_national').select().single();
@@ -383,21 +382,21 @@ jobs:
 
             Future<List<Map<String, dynamic>>> getLiveCoverage({String? commune}) async {
               if (commune != null && commune.isNotEmpty) {
-                // Filtrage par commune via requête directe
+                // Filtrage par commune via requete directe
                 final bureaux = await _sb.from('bureaux').select('id').eq('commune', commune);
                 final ids = (bureaux as List).map((b) => b['id'].toString()).toList();
                 if (ids.isEmpty) return [];
                 final snaps = await _sb.from('turnout_snapshots')
-          .select('heure, votants, bureau_id')
-          .inFilter('bureau_id', ids)
-          .order('heure');
-                // Agréger par heure
+                    .select('heure, votants, bureau_id')
+                    .inFilter('bureau_id', ids)
+                    .order('heure');
+                // Agreger par heure
                 final Map<int, Map<String, dynamic>> byHeure = {};
                 final totalBureaux = ids.length;
                 for (final s in snaps as List) {
                   final h = s['heure'] as int;
                   if (!byHeure.containsKey(h)) {
-          byHeure[h] = {'heure': h, 'nb_snapshots': 0, 'bureaux_actifs': <String>{}, 'total_votants': 0, 'total_bureaux': totalBureaux};
+                    byHeure[h] = {'heure': h, 'nb_snapshots': 0, 'bureaux_actifs': <String>{}, 'total_votants': 0, 'total_bureaux': totalBureaux};
                   }
                   byHeure[h]!['nb_snapshots'] = (byHeure[h]!['nb_snapshots'] as int) + 1;
                   (byHeure[h]!['bureaux_actifs'] as Set<String>).add(s['bureau_id'].toString());
@@ -406,14 +405,14 @@ jobs:
                 return byHeure.values.map((h) {
                   final actifs = (h['bureaux_actifs'] as Set<String>).length;
                   return {
-          'heure': h['heure'],
-          'nb_snapshots': h['nb_snapshots'],
-          'bureaux_actifs': actifs,
-          'bureaux_valides': actifs,
-          'total_bureaux': h['total_bureaux'],
-          'moy_votants': actifs > 0 ? h['total_votants'] / actifs : 0,
-          'taux_participation': 0,
-          'pct_couverture': totalBureaux > 0 ? (actifs / totalBureaux * 100) : 0,
+                    'heure': h['heure'],
+                    'nb_snapshots': h['nb_snapshots'],
+                    'bureaux_actifs': actifs,
+                    'bureaux_valides': actifs,
+                    'total_bureaux': h['total_bureaux'],
+                    'moy_votants': actifs > 0 ? h['total_votants'] / actifs : 0,
+                    'taux_participation': 0,
+                    'pct_couverture': totalBureaux > 0 ? (actifs / totalBureaux * 100) : 0,
                   };
                 }).toList()..sort((a, b) => (a['heure'] as int).compareTo(b['heure'] as int));
               }
@@ -431,7 +430,7 @@ jobs:
               return List<Map<String, dynamic>>.from(res);
             }
 
-            // ── Upload photo PV ──────────────────────────────────────
+            // -- Upload photo PV --------------------------------------
             Future<String?> uploadPhotoPv(String bureauId, List<int> bytes) async {
               try {
                 final path = 'pv/$bureauId/${DateTime.now().millisecondsSinceEpoch}.jpg';
@@ -445,7 +444,7 @@ jobs:
           }
 
 
-            // ── Agents status ────────────────────────────────────────
+            // -- Agents status ----------------------------------------
             Future<List<Map<String, dynamic>>> getAgentsStatus({String? commune}) async {
               var q = _sb.from('v_agents_status').select();
               if (commune != null && commune.isNotEmpty) {
@@ -455,7 +454,7 @@ jobs:
               return List<Map<String, dynamic>>.from(res);
             }
 
-            // ── Messages ─────────────────────────────────────────────
+            // -- Messages ---------------------------------------------
             Future<List<Map<String, dynamic>>> getMessagesSent(String userId) async {
               final res = await _sb.from('messages')
                   .select('*, destinataire:destinataire_id(code_unique)')
@@ -505,8 +504,8 @@ jobs:
             Future<void> updateLastSeen(String userId) async {
               try {
                 await _sb.from('utilisateurs')
-          .update({'last_seen': DateTime.now().toIso8601String()})
-          .eq('id', userId);
+                    .update({'last_seen': DateTime.now().toIso8601String()})
+                    .eq('id', userId);
               } catch (_) {}
             }
 
@@ -538,7 +537,6 @@ jobs:
               return s.length + p.length;
             }
           }
-
           EOF
 
           # Add Uint8List import to services.dart
@@ -546,7 +544,7 @@ jobs:
 
                 - name: Create screen files
                   run: |
-          # ── login_screen.dart ────────────────────────────────
+          # -- login_screen.dart --------------------------------
           cat > lib/screens/login_screen.dart << 'EOF'
           import 'package:flutter/material.dart';
           import '../services/services.dart';
@@ -611,7 +609,7 @@ jobs:
           }
           EOF
 
-          # ── agent_home.dart ──────────────────────────────────
+          # -- agent_home.dart ----------------------------------
           cat > lib/screens/agent/agent_home.dart << 'EOF'
           import 'package:flutter/material.dart';
           import '../../services/services.dart';
@@ -674,7 +672,7 @@ jobs:
                               child: ListTile(
                                 leading: const Icon(Icons.ballot, color: Color(0xFF1B5E20)),
                                 title: Text(b.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                subtitle: Text('${b.region} · ${b.commune} · Inscrits: ${b.inscritsCorriges}'),
+                                subtitle: Text('${b.region} - ${b.commune} - Inscrits: ${b.inscritsCorriges}'),
                                 trailing: const Icon(Icons.chevron_right),
                                 onTap: () => Navigator.push(context, MaterialPageRoute(
                                   builder: (_) => AgentBureauDetail(bureau: b, agentId: _agentId)))));
@@ -684,7 +682,7 @@ jobs:
           }
           EOF
 
-          # ── agent_bureau_detail.dart (simplified) ────────────
+          # -- agent_bureau_detail.dart (simplified) ------------
           cat > lib/screens/agent/agent_bureau_detail.dart << 'EOF'
           import 'package:flutter/material.dart';
           import '../../models/models.dart';
@@ -723,7 +721,7 @@ jobs:
                   backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
                   bottom: TabBar(controller: _tabs, labelColor: Colors.white, unselectedLabelColor: Colors.white60,
                     indicatorColor: Colors.white,
-                    tabs: const [Tab(icon: Icon(Icons.access_time), text: 'Relevé LIVE'),
+                    tabs: const [Tab(icon: Icon(Icons.access_time), text: 'Releve LIVE'),
                       Tab(icon: Icon(Icons.assignment), text: 'PV Final')])),
                 body: _loading ? const Center(child: CircularProgressIndicator())
                   : TabBarView(controller: _tabs, children: [_tabLive(), _tabPv()]));
@@ -735,11 +733,11 @@ jobs:
                 Card(color: const Color(0xFFE8F5E9), child: Padding(padding: const EdgeInsets.all(14),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
                     _kpi('Inscrits', widget.bureau.inscrits.toString()),
-                    _kpi('Corrigés', widget.bureau.inscritsCorriges.toString(), bold: true),
+                    _kpi('Corriges', widget.bureau.inscritsCorriges.toString(), bold: true),
                   ]))),
                 const SizedBox(height: 12),
                 if (!_releveDejaSaisi) Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-                  Text('Relevé ${_heureActuelle}h', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Releve ${_heureActuelle}h', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
                   TextField(controller: cVotants, keyboardType: TextInputType.number,
                     decoration: InputDecoration(labelText: 'Nombre de votants',
@@ -751,16 +749,16 @@ jobs:
                     onPressed: () async {
                       final v = int.tryParse(cVotants.text);
                       if (v == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saisissez un nombre valide'), backgroundColor: Colors.red)); return; }
-                      if (v > widget.bureau.inscritsCorriges) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Votants > Inscrits corrigés!'), backgroundColor: Colors.red)); return; }
+                      if (v > widget.bureau.inscritsCorriges) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Votants > Inscrits corriges!'), backgroundColor: Colors.red)); return; }
                       final ok = await _data.submitSnapshot(bureauId: widget.bureau.id, heure: _heureActuelle, votants: v, saisiPar: widget.agentId);
                       if (!mounted) return;
-                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Relevé ${_heureActuelle}h transmis!'), backgroundColor: Colors.green)); _charger(); }
+                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Releve ${_heureActuelle}h transmis!'), backgroundColor: Colors.green)); _charger(); }
                     },
-                    icon: const Icon(Icons.send), label: Text('Envoyer relevé ${_heureActuelle}h')),
+                    icon: const Icon(Icons.send), label: Text('Envoyer releve ${_heureActuelle}h')),
                 ])))
                 else Card(color: Colors.green.shade50, child: Padding(padding: const EdgeInsets.all(12),
                   child: Row(children: [const Icon(Icons.check_circle, color: Colors.green), const SizedBox(width: 8),
-                    Text('Relevé ${_heureActuelle}h déjà transmis', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]))),
+                    Text('Releve ${_heureActuelle}h deja transmis', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]))),
                 const SizedBox(height: 12),
                 if (_snapshots.isNotEmpty) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text('Historique', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -777,7 +775,7 @@ jobs:
               if (_pv?.statut == 'valide') return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.verified, color: Colors.green, size: 64),
                 const SizedBox(height: 12),
-                const Text('PV Validé ✅', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+                const Text('PV Valide [OK]', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
                 Text('Candidat A: ${_pv!.pctA.toStringAsFixed(1)}% | Candidat B: ${_pv!.pctB.toStringAsFixed(1)}%'),
               ]));
               final cV = TextEditingController(text: _pv?.votants.toString() ?? '');
@@ -786,7 +784,7 @@ jobs:
               final cB = TextEditingController(text: _pv?.voixB.toString() ?? '');
               return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
                 if (_pv?.statut == 'rejete') Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(12),
-                  child: Text('❌ Rejeté: ${_pv!.noteRejet ?? ""}', style: const TextStyle(color: Colors.red)))),
+                  child: Text('[ERR] Rejete: ${_pv!.noteRejet ?? ""}', style: const TextStyle(color: Colors.red)))),
                 Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
                   const Text('PV Final', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
@@ -798,7 +796,7 @@ jobs:
                     onPressed: () async {
                       final v = int.tryParse(cV.text), n = int.tryParse(cN.text), a = int.tryParse(cA.text), b = int.tryParse(cB.text);
                       if (v == null || n == null || a == null || b == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Remplissez tous les champs'), backgroundColor: Colors.red)); return; }
-                      if (v != n + a + b) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $v ≠ $n + $a + $b'), backgroundColor: Colors.red)); return; }
+                      if (v != n + a + b) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $v != $n + $a + $b'), backgroundColor: Colors.red)); return; }
                       final ok = await _data.submitPv(bureauId: widget.bureau.id, votants: v, nuls: n, voixA: a, voixB: b, saisiPar: widget.agentId);
                       if (!mounted) return;
                       if (ok) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV transmis!'), backgroundColor: Colors.green)); _charger(); }
@@ -820,7 +818,7 @@ jobs:
           }
           EOF
 
-          # ── superviseur_home.dart ─────────────────────────────
+          # -- superviseur_home.dart -----------------------------
           cat > lib/screens/superviseur/superviseur_home.dart << 'EOF'
           import 'package:flutter/material.dart';
           import '../../services/services.dart';
@@ -877,14 +875,14 @@ jobs:
               final isNational = _role == AppRoles.superviseurNational;
               return Scaffold(
                 appBar: AppBar(
-                  title: Text(isNational ? 'Dashboard National' : 'Dashboard Régional'),
+                  title: Text(isNational ? 'Dashboard National' : 'Dashboard Regional'),
                   actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(child: Text(_nom,
-                style: const TextStyle(fontSize: 13, color: Colors.white70))),
-          ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Center(child: Text(_nom,
+                          style: const TextStyle(fontSize: 13, color: Colors.white70))),
+                    ),
+                    IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
                   ],
                 ),
                 body: _pages[_page],
@@ -892,17 +890,16 @@ jobs:
                   selectedIndex: _page,
                   onDestinationSelected: (i) => setState(() => _page = i),
                   destinations: const [
-          NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Résultats'),
-          NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
-          NavigationDestination(icon: Icon(Icons.people), label: 'Agents'),
-          NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
-          NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies'),
+                    NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Resultats'),
+                    NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
+                    NavigationDestination(icon: Icon(Icons.people), label: 'Agents'),
+                    NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
+                    NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies'),
                   ],
                 ),
               );
             }
           }
-
           EOF
 
           # Copy dashboard files from uploaded versions (they have correct content)
@@ -911,13 +908,13 @@ jobs:
             mv dashboard_national.dart lib/screens/superviseur/
           fi
 
-          # ── agents_screen.dart ────────────────────────────────
+          # -- agents_screen.dart --------------------------------
           cat > lib/screens/superviseur/agents_screen.dart << 'EOF'
           import 'package:flutter/material.dart';
           import '../../services/services.dart';
 
           // ============================================================
-          //  ÉCRAN : Liste des agents + statut en ligne + messagerie
+          //  ECRAN : Liste des agents + statut en ligne + messagerie
           // ============================================================
           class AgentsScreen extends StatefulWidget {
             const AgentsScreen({super.key});
@@ -992,7 +989,7 @@ jobs:
               );
             }
 
-            // ── Tab Agents ──────────────────────────────────────────
+            // -- Tab Agents ------------------------------------------
             Widget _tabAgents() {
               final enLigne    = _agents.where((a) => a['statut'] == 'en_ligne').length;
               final recemment  = _agents.where((a) => a['statut'] == 'recemment').length;
@@ -1001,13 +998,13 @@ jobs:
               return RefreshIndicator(
                 onRefresh: _charger,
                 child: Column(children: [
-                  // Résumé statuts
+                  // Resume statuts
                   Padding(
           padding: const EdgeInsets.all(12),
           child: Row(children: [
             _statutChip('En ligne', enLigne, Colors.green),
             const SizedBox(width: 8),
-            _statutChip('Récent', recemment, Colors.orange),
+            _statutChip('Recent', recemment, Colors.orange),
             const SizedBox(width: 8),
             _statutChip('Hors ligne', horsLigne, Colors.red),
           ]),
@@ -1047,11 +1044,11 @@ jobs:
                   color = Colors.green; icon = Icons.circle; statutLabel = 'En ligne';
                   break;
                 case 'recemment':
-                  color = Colors.orange; icon = Icons.circle; statutLabel = 'Récent';
+                  color = Colors.orange; icon = Icons.circle; statutLabel = 'Recent';
                   break;
                 default:
                   color = Colors.grey; icon = Icons.circle_outlined;
-                  statutLabel = statut == 'jamais_connecte' ? 'Jamais connecté' : 'Hors ligne';
+                  statutLabel = statut == 'jamais_connecte' ? 'Jamais connecte' : 'Hors ligne';
               }
 
               final nbReleves = (a['nb_releves'] as num?)?.toInt() ?? 0;
@@ -1064,15 +1061,15 @@ jobs:
           backgroundColor: color.withOpacity(0.15),
           child: Icon(icon, color: color, size: 14),
                   ),
-                  title: Text(a['code_unique'] ?? '—',
+                  title: Text(a['code_unique'] ?? '--',
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${a['centre'] ?? ''} · Bureau ${a['bureau_code'] ?? ''}',
+          Text('${a['centre'] ?? ''} - Bureau ${a['bureau_code'] ?? ''}',
               style: const TextStyle(fontSize: 11)),
           Row(children: [
             Icon(Icons.access_time, size: 11, color: Colors.grey),
             const SizedBox(width: 3),
-            Text('$nbReleves relevés · $nbPv PV',
+            Text('$nbReleves releves - $nbPv PV',
                 style: const TextStyle(fontSize: 10, color: Colors.grey)),
           ]),
                   ]),
@@ -1091,7 +1088,7 @@ jobs:
               );
             }
 
-            // ── Tab Messages ──────────────────────────────────────────
+            // -- Tab Messages ------------------------------------------
             Widget _tabMessages() {
               if (_messages.isEmpty) {
                 return const Center(child: Column(
@@ -1099,7 +1096,7 @@ jobs:
                   children: [
           Icon(Icons.mark_chat_unread_outlined, size: 64, color: Colors.grey),
           SizedBox(height: 12),
-          Text('Aucun message envoyé', style: TextStyle(color: Colors.grey)),
+          Text('Aucun message envoye', style: TextStyle(color: Colors.grey)),
                   ],
                 ));
               }
@@ -1115,8 +1112,8 @@ jobs:
               child: Icon(Icons.send, color: Color(0xFF1B5E20), size: 18),
             ),
             title: Text(m['commune'] != null
-                ? '📢 Broadcast ${m['commune']}'
-                : m['destinataire'] ?? '—',
+                ? '[BROADCAST] Broadcast ${m['commune']}'
+                : m['destinataire'] ?? '--',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
             subtitle: Text(m['contenu'] ?? '',
                 maxLines: 2, overflow: TextOverflow.ellipsis,
@@ -1131,13 +1128,13 @@ jobs:
               );
             }
 
-            // ── Actions ──────────────────────────────────────────────
+            // -- Actions ----------------------------------------------
             Future<void> _envoyerMessage(Map<String, dynamic> agent) async {
               String contenu = '';
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (_) => AlertDialog(
-                  title: Text('Message à ${agent['code_unique']}'),
+                  title: Text('Message a ${agent['code_unique']}'),
                   content: TextField(
           decoration: const InputDecoration(
               labelText: 'Votre message', border: OutlineInputBorder()),
@@ -1163,7 +1160,7 @@ jobs:
           contenu: contenu);
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message envoyé ✓'),
+          const SnackBar(content: Text('Message envoye ?'),
               backgroundColor: Colors.green));
                 _charger();
               }
@@ -1174,7 +1171,7 @@ jobs:
               final confirm = await showDialog<bool>(
                 context: context,
                 builder: (_) => AlertDialog(
-                  title: Text('📢 Diffuser à tous les agents${_commune != null ? ' de $_commune' : ''}'),
+                  title: Text('[BROADCAST] Diffuser a tous les agents${_commune != null ? ' de $_commune' : ''}'),
                   content: TextField(
           decoration: const InputDecoration(
               labelText: 'Message pour tous les agents',
@@ -1201,7 +1198,7 @@ jobs:
           contenu: contenu);
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Diffusé à ${_agents.length} agents ✓'),
+          SnackBar(content: Text('Diffuse a ${_agents.length} agents ?'),
               backgroundColor: Colors.green));
                 _charger();
               }
@@ -1255,7 +1252,7 @@ jobs:
             @override
             Widget build(BuildContext context) {
               if (_loading) return const Center(child: CircularProgressIndicator());
-              if (_kpi == null) return const Center(child: Text('Données non disponibles'));
+              if (_kpi == null) return const Center(child: Text('Donnees non disponibles'));
               final pctA = _d(_kpi!['pct_candidat_a']);
               final pctB = _d(_kpi!['pct_candidat_b']);
               final taux = _d(_kpi!['taux_participation_corriges']);
@@ -1271,10 +1268,10 @@ jobs:
                     Expanded(child: _kpiCard('Candidat B', '${pctB.toStringAsFixed(1)}%', Icons.how_to_vote, Colors.red)),
                   ]),
                   const SizedBox(height: 16),
-                  const Text('Par région', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text('Par region', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ..._regions.map((r) => Card(margin: const EdgeInsets.only(top: 8),
                     child: ListTile(
-                      title: Text(r['region'] ?? '—', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(r['region'] ?? '--', style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Text('A: ${_d(r["pct_a"]).toStringAsFixed(1)}% | B: ${_d(r["pct_b"]).toStringAsFixed(1)}%'),
                       trailing: Text('${_d(r["taux_participation"]).toStringAsFixed(0)}%',
                         style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)))))),
@@ -1299,7 +1296,7 @@ jobs:
           import '../../utils/constants.dart';
 
           // ============================================================
-          //  DASHBOARD LIVE — Suivi participation horaire
+          //  DASHBOARD LIVE -- Suivi participation horaire
           // ============================================================
           class DashboardLive extends StatefulWidget {
             const DashboardLive({super.key});
@@ -1339,105 +1336,105 @@ jobs:
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(14),
                   child: Column(children: [
-          // Graphique couverture par heure
-          Card(child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Couverture LIVE par heure',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              const SizedBox(height: 4),
-              const Text('% bureaux ayant transmis un relevé',
-                  style: TextStyle(fontSize: 11, color: Colors.grey)),
-              const SizedBox(height: 16),
-              if (_coverage.isNotEmpty) SizedBox(
-                height: 200,
-                child: BarChart(BarChartData(
-                  barGroups: _coverage.map((c) {
-                    final h = (c['heure'] as num).toInt();
-                    final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
-                    return BarChartGroupData(x: h, barRods: [
-                      BarChartRodData(
-                        toY: pct,
-                        color: pct >= 80 ? Colors.green
-                            : pct >= 50 ? Colors.orange : Colors.red,
-                        width: 18, borderRadius: BorderRadius.circular(4),
-                      ),
-                    ]);
-                  }).toList(),
-                  titlesData: FlTitlesData(
-                    bottomTitles: AxisTitles(sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (v, _) => Text('${v.toInt()}h',
-                          style: const TextStyle(fontSize: 9)),
-                    )),
-                    leftTitles: AxisTitles(sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (v, _) => Text('${v.toInt()}%',
-                          style: const TextStyle(fontSize: 9)),
-                      reservedSize: 32,
-                    )),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  maxY: 100,
-                  gridData: FlGridData(
-                    getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade200),
-                  ),
-                  borderData: FlBorderData(show: false),
-                )),
-              ),
-            ]),
-          )),
-          const SizedBox(height: 8),
-
-          // Tableau détaillé
-          Card(child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Détail par heure',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              const SizedBox(height: 12),
-              ..._coverage.map((c) {
-                final h = (c['heure'] as num).toInt();
-                final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
-                final total = (c['total_bureaux'] as num?)?.toInt() ?? 0;
-                final valides = (c['bureaux_valides'] as num?)?.toInt() ?? 0;
-                final taux = (c['taux_participation'] as num?)?.toDouble() ?? 0;
-                final color = pct >= 80 ? Colors.green : pct >= 50 ? Colors.orange : Colors.grey;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Row(children: [
-                    Container(
-                      width: 42, height: 42,
-                      decoration: BoxDecoration(
-                          color: color.withOpacity(0.12),
-                          shape: BoxShape.circle),
-                      child: Center(child: Text('${h}h',
-                          style: TextStyle(fontWeight: FontWeight.bold,
-                              color: color, fontSize: 12))),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: pct / 100, minHeight: 8,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation(color),
+                    // Graphique couverture par heure
+                    Card(child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Couverture LIVE par heure',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 4),
+                        const Text('% bureaux ayant transmis un releve',
+                            style: TextStyle(fontSize: 11, color: Colors.grey)),
+                        const SizedBox(height: 16),
+                        if (_coverage.isNotEmpty) SizedBox(
+                          height: 200,
+                          child: BarChart(BarChartData(
+                            barGroups: _coverage.map((c) {
+                              final h = (c['heure'] as num).toInt();
+                              final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
+                              return BarChartGroupData(x: h, barRods: [
+                                BarChartRodData(
+                                  toY: pct,
+                                  color: pct >= 80 ? Colors.green
+                                      : pct >= 50 ? Colors.orange : Colors.red,
+                                  width: 18, borderRadius: BorderRadius.circular(4),
+                                ),
+                              ]);
+                            }).toList(),
+                            titlesData: FlTitlesData(
+                              bottomTitles: AxisTitles(sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (v, _) => Text('${v.toInt()}h',
+                                    style: const TextStyle(fontSize: 9)),
+                              )),
+                              leftTitles: AxisTitles(sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (v, _) => Text('${v.toInt()}%',
+                                    style: const TextStyle(fontSize: 9)),
+                                reservedSize: 32,
+                              )),
+                              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                            ),
+                            maxY: 100,
+                            gridData: FlGridData(
+                              getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade200),
+                            ),
+                            borderData: FlBorderData(show: false),
+                          )),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text('$valides/$total bureaux · part. ${taux.toStringAsFixed(1)}%',
-                          style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                    ])),
-                    const SizedBox(width: 8),
-                    Text('${pct.toStringAsFixed(0)}%',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-                  ]),
-                );
-              }),
-            ]),
-          )),
+                      ]),
+                    )),
+                    const SizedBox(height: 8),
+
+                    // Tableau detaille
+                    Card(child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Text('Detail par heure',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        const SizedBox(height: 12),
+                        ..._coverage.map((c) {
+                          final h = (c['heure'] as num).toInt();
+                          final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
+                          final total = (c['total_bureaux'] as num?)?.toInt() ?? 0;
+                          final valides = (c['bureaux_valides'] as num?)?.toInt() ?? 0;
+                          final taux = (c['taux_participation'] as num?)?.toDouble() ?? 0;
+                          final color = pct >= 80 ? Colors.green : pct >= 50 ? Colors.orange : Colors.grey;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Row(children: [
+                              Container(
+                                width: 42, height: 42,
+                                decoration: BoxDecoration(
+                                    color: color.withOpacity(0.12),
+                                    shape: BoxShape.circle),
+                                child: Center(child: Text('${h}h',
+                                    style: TextStyle(fontWeight: FontWeight.bold,
+                                        color: color, fontSize: 12))),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: LinearProgressIndicator(
+                                    value: pct / 100, minHeight: 8,
+                                    backgroundColor: Colors.grey.shade200,
+                                    valueColor: AlwaysStoppedAnimation(color),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text('$valides/$total bureaux - part. ${taux.toStringAsFixed(1)}%',
+                                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                              ])),
+                              const SizedBox(width: 8),
+                              Text('${pct.toStringAsFixed(0)}%',
+                                  style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                            ]),
+                          );
+                        }),
+                      ]),
+                    )),
                   ]),
                 ),
               );
@@ -1445,7 +1442,7 @@ jobs:
           }
 
           // ============================================================
-          //  VALIDATION SCREEN — Valider/Rejeter PV et relevés
+          //  VALIDATION SCREEN -- Valider/Rejeter PV et releves
           // ============================================================
           class ValidationScreen extends StatefulWidget {
             const ValidationScreen({super.key});
@@ -1495,22 +1492,22 @@ jobs:
             Widget build(BuildContext context) {
               return Scaffold(
                 body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(children: [
-              TabBar(
-                controller: _tabs,
-                tabs: [
-                  Tab(text: 'PV (${_pvSoumis.length})'),
-                  const Tab(text: 'Relevés LIVE'),
-                ],
-                labelColor: const Color(0xFF1B5E20),
-                indicatorColor: const Color(0xFF1B5E20),
-              ),
-              Expanded(child: TabBarView(
-                controller: _tabs,
-                children: [_tabPv(), _tabSnapshots()],
-              )),
-            ]),
+                    ? const Center(child: CircularProgressIndicator())
+                    : Column(children: [
+                        TabBar(
+                          controller: _tabs,
+                          tabs: [
+                            Tab(text: 'PV (${_pvSoumis.length})'),
+                            const Tab(text: 'Releves LIVE'),
+                          ],
+                          labelColor: const Color(0xFF1B5E20),
+                          indicatorColor: const Color(0xFF1B5E20),
+                        ),
+                        Expanded(child: TabBarView(
+                          controller: _tabs,
+                          children: [_tabPv(), _tabSnapshots()],
+                        )),
+                      ]),
                 floatingActionButton: FloatingActionButton(
                   onPressed: _charger,
                   backgroundColor: const Color(0xFF1B5E20),
@@ -1524,9 +1521,9 @@ jobs:
                 return const Center(child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-          Icon(Icons.check_circle, size: 64, color: Colors.green),
-          SizedBox(height: 12),
-          Text('Tous les PV sont traités', style: TextStyle(color: Colors.grey)),
+                    Icon(Icons.check_circle, size: 64, color: Colors.green),
+                    SizedBox(height: 12),
+                    Text('Tous les PV sont traites', style: TextStyle(color: Colors.grey)),
                   ],
                 ));
               }
@@ -1538,63 +1535,63 @@ jobs:
                   final pv = item['pv'] as PvResult;
                   final b  = item['bureau'] as Bureau?;
                   return Card(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(b?.nom ?? '—',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              Text('${b?.region ?? ''} · ${b?.commune ?? ''} · ${b?.centre ?? ''}',
-                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              const Divider(height: 16),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                _pvStat('Votants', pv.votants),
-                _pvStat('Nuls', pv.nuls),
-                _pvStat('A', pv.voixA),
-                _pvStat('B', pv.voixB),
-              ]),
-              // Vérification cohérence
-              if (pv.votants != pv.nuls + pv.voixA + pv.voixB)
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8)),
-                  child: Row(children: [
-                    const Icon(Icons.warning, color: Colors.red, size: 16),
-                    const SizedBox(width: 6),
-                    Text('INCOHÉRENCE : ${pv.votants} ≠ ${pv.nuls}+${pv.voixA}+${pv.voixB}',
-                        style: const TextStyle(color: Colors.red, fontSize: 12)),
-                  ]),
-                ),
-              if (pv.photoUrl != null) Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(children: [
-                  const Icon(Icons.image, size: 14, color: Colors.grey),
-                  const SizedBox(width: 4),
-                  const Text('Photo PV disponible',
-                      style: TextStyle(fontSize: 11, color: Colors.grey)),
-                ]),
-              ),
-              const SizedBox(height: 12),
-              Row(children: [
-                Expanded(child: OutlinedButton.icon(
-                  onPressed: () => _rejeterPv(pv),
-                  icon: const Icon(Icons.cancel, color: Colors.red),
-                  label: const Text('Rejeter', style: TextStyle(color: Colors.red)),
-                  style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
-                )),
-                const SizedBox(width: 8),
-                Expanded(child: ElevatedButton.icon(
-                  onPressed: () => _validerPv(pv.id!),
-                  icon: const Icon(Icons.check_circle),
-                  label: const Text('Valider'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                )),
-              ]),
-            ]),
-          ),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(b?.nom ?? '--',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        Text('${b?.region ?? ''} - ${b?.commune ?? ''} - ${b?.centre ?? ''}',
+                            style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        const Divider(height: 16),
+                        Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                          _pvStat('Votants', pv.votants),
+                          _pvStat('Nuls', pv.nuls),
+                          _pvStat('A', pv.voixA),
+                          _pvStat('B', pv.voixB),
+                        ]),
+                        // Verification coherence
+                        if (pv.votants != pv.nuls + pv.voixA + pv.voixB)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(8)),
+                            child: Row(children: [
+                              const Icon(Icons.warning, color: Colors.red, size: 16),
+                              const SizedBox(width: 6),
+                              Text('INCOHERENCE : ${pv.votants} != ${pv.nuls}+${pv.voixA}+${pv.voixB}',
+                                  style: const TextStyle(color: Colors.red, fontSize: 12)),
+                            ]),
+                          ),
+                        if (pv.photoUrl != null) Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(children: [
+                            const Icon(Icons.image, size: 14, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            const Text('Photo PV disponible',
+                                style: TextStyle(fontSize: 11, color: Colors.grey)),
+                          ]),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(child: OutlinedButton.icon(
+                            onPressed: () => _rejeterPv(pv),
+                            icon: const Icon(Icons.cancel, color: Colors.red),
+                            label: const Text('Rejeter', style: TextStyle(color: Colors.red)),
+                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: ElevatedButton.icon(
+                            onPressed: () => _validerPv(pv.id!),
+                            icon: const Icon(Icons.check_circle),
+                            label: const Text('Valider'),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                          )),
+                        ]),
+                      ]),
+                    ),
                   );
                 },
               );
@@ -1611,10 +1608,10 @@ jobs:
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(Icons.access_time, size: 48, color: Colors.grey),
                   SizedBox(height: 12),
-                  Text('Validation des relevés LIVE', style: TextStyle(color: Colors.grey)),
+                  Text('Validation des releves LIVE', style: TextStyle(color: Colors.grey)),
                   SizedBox(height: 4),
-                  Text('Sélectionnez un bureau pour valider',
-            style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text('Selectionnez un bureau pour valider',
+                      style: TextStyle(color: Colors.grey, fontSize: 12)),
                 ]),
               );
             }
@@ -1624,7 +1621,7 @@ jobs:
               if (!mounted) return;
               if (ok) {
                 ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('PV validé ✓'), backgroundColor: Colors.green));
+                    const SnackBar(content: Text('PV valide ?'), backgroundColor: Colors.green));
                 _charger();
               }
             }
@@ -1636,18 +1633,18 @@ jobs:
                 builder: (_) => AlertDialog(
                   title: const Text('Rejeter le PV'),
                   content: TextField(
-          decoration: const InputDecoration(
-              labelText: 'Motif du rejet', border: OutlineInputBorder()),
-          onChanged: (v) => note = v,
+                    decoration: const InputDecoration(
+                        labelText: 'Motif du rejet', border: OutlineInputBorder()),
+                    onChanged: (v) => note = v,
                   ),
                   actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('Annuler')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Rejeter'),
-          ),
+                    TextButton(onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Annuler')),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                      child: const Text('Rejeter'),
+                    ),
                   ],
                 ),
               );
@@ -1656,7 +1653,7 @@ jobs:
                 if (!mounted) return;
                 if (ok) {
                   ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('PV rejeté'), backgroundColor: Colors.red));
+                      const SnackBar(content: Text('PV rejete'), backgroundColor: Colors.red));
                   _charger();
                 }
               }
@@ -1696,9 +1693,9 @@ jobs:
                 return const Center(child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-          Icon(Icons.verified_user, size: 64, color: Colors.green),
-          SizedBox(height: 12),
-          Text('Aucune anomalie détectée', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                    Icon(Icons.verified_user, size: 64, color: Colors.green),
+                    SizedBox(height: 12),
+                    Text('Aucune anomalie detectee', style: TextStyle(color: Colors.grey, fontSize: 16)),
                   ],
                 ));
               }
@@ -1711,14 +1708,14 @@ jobs:
                 child: ListView(
                   padding: const EdgeInsets.all(12),
                   children: [
-          if (critiques.isNotEmpty) ...[
-            _headerSection('🔴 CRITIQUE (${critiques.length})', Colors.red),
-            ...critiques.map((a) => _anomalieCard(a, Colors.red)),
-          ],
-          if (warnings.isNotEmpty) ...[
-            _headerSection('⚠️ WARNING (${warnings.length})', Colors.orange),
-            ...warnings.map((a) => _anomalieCard(a, Colors.orange)),
-          ],
+                    if (critiques.isNotEmpty) ...[
+                      _headerSection(' CRITIQUE (${critiques.length})', Colors.red),
+                      ...critiques.map((a) => _anomalieCard(a, Colors.red)),
+                    ],
+                    if (warnings.isNotEmpty) ...[
+                      _headerSection('[!] WARNING (${warnings.length})', Colors.orange),
+                      ...warnings.map((a) => _anomalieCard(a, Colors.orange)),
+                    ],
                   ],
                 ),
               );
@@ -1732,51 +1729,50 @@ jobs:
             Widget _anomalieCard(Map<String, dynamic> a, Color color) {
               final List<String> details = [];
               if (a['anomalie_votants_sup_inscrits'] == true)
-                details.add('Votants (${a['votants']}) > Inscrits corrigés (${a['inscrits_corriges']})');
+                details.add('Votants (${a['votants']}) > Inscrits corriges (${a['inscrits_corriges']})');
               if (a['anomalie_total_incorrect'] == true)
-                details.add('Total : ${a['votants']} ≠ ${a['nuls']} nuls + ${a['exprimes']} exprimés');
+                details.add('Total : ${a['votants']} != ${a['nuls']} nuls + ${a['exprimes']} exprimes');
               if (a['anomalie_nuls_eleves'] == true)
-                details.add('Bulletins nuls élevés : ${a['nuls']} / ${a['votants']}');
+                details.add('Bulletins nuls eleves : ${a['nuls']} / ${a['votants']}');
               if (a['anomalie_zero_exprimes'] == true)
-                details.add('Aucun exprimé alors que ${a['votants']} votants');
+                details.add('Aucun exprime alors que ${a['votants']} votants');
               if (a['anomalie_photo_manquante'] == true)
                 details.add('Photo du PV manquante');
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 shape: RoundedRectangleBorder(
-          side: BorderSide(color: color.withOpacity(0.4)),
-          borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: color.withOpacity(0.4)),
+                    borderRadius: BorderRadius.circular(12)),
                 child: Padding(
                   padding: const EdgeInsets.all(14),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Icon(color == Colors.red ? Icons.error : Icons.warning,
-                color: color, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(a['nom'] ?? '—',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-          ]),
-          Text('${a['region']} · ${a['commune']} · ${a['centre']}',
-              style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          const Divider(height: 12),
-          ...details.map((d) => Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Row(children: [
-              Icon(Icons.arrow_right, color: color, size: 16),
-              const SizedBox(width: 4),
-              Expanded(child: Text(d, style: TextStyle(fontSize: 12, color: color))),
-            ]),
-          )),
+                    Row(children: [
+                      Icon(color == Colors.red ? Icons.error : Icons.warning,
+                          color: color, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(a['nom'] ?? '--',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                    ]),
+                    Text('${a['region']} - ${a['commune']} - ${a['centre']}',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    const Divider(height: 12),
+                    ...details.map((d) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(children: [
+                        Icon(Icons.arrow_right, color: color, size: 16),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(d, style: TextStyle(fontSize: 12, color: color))),
+                      ]),
+                    )),
                   ]),
                 ),
               );
             }
           }
-
           EOF
 
-          # ── main.dart ─────────────────────────────────────────
+          # -- main.dart -----------------------------------------
           cat > lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
           import 'package:supabase_flutter/supabase_flutter.dart';
