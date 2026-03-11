@@ -4,6 +4,7 @@ import '../../utils/constants.dart';
 import '../login_screen.dart';
 import 'dashboard_national.dart';
 import 'dashboard_live.dart';
+import 'agents_screen.dart';
 import 'validation_screen.dart';
 import 'anomalies_screen.dart';
 
@@ -42,6 +43,7 @@ class _SuperviseurHomeState extends State<SuperviseurHome> {
   final _pages = const [
     DashboardNational(),
     DashboardLive(),
+    AgentsScreen(),
     ValidationScreen(),
     AnomaliesScreen(),
   ];
@@ -68,6 +70,7 @@ class _SuperviseurHomeState extends State<SuperviseurHome> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Résultats'),
           NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
+          NavigationDestination(icon: Icon(Icons.people), label: 'Agents'),
           NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
           NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies'),
         ],
