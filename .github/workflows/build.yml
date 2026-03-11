@@ -171,6 +171,7 @@ jobs:
 
           # -- services.dart -------------------------------------
           cat > lib/services/services.dart << 'EOF'
+          import 'dart:typed_data';
           import 'package:supabase_flutter/supabase_flutter.dart';
           import 'package:shared_preferences/shared_preferences.dart';
           import '../models/models.dart';
@@ -431,7 +432,7 @@ jobs:
             }
 
             // -- Upload photo PV --------------------------------------
-            Future<String?> uploadPhotoPv(String bureauId, List<int> bytes) async {
+            Future<String?> uploadPhotoPv(String bureauId, Uint8List bytes) async {
               try {
                 final path = 'pv/$bureauId/${DateTime.now().millisecondsSinceEpoch}.jpg';
                 await _sb.storage.from('pv-photos').uploadBinary(path, bytes);
@@ -512,6 +513,66 @@ jobs:
           // ============================================================
           //  OFFLINE SERVICE
           // ============================================================
+
+              // Agents status
+              Future<List<Map<String,dynamic>>> getAgentsStatus({String? commune}) async {
+                try {
+                  var q = _sb.from('v_agents_status').select();
+                  if (commune != null) q = q.eq('commune', commune);
+                  final res = await q.order('statut').order('code_unique');
+                  return List<Map<String,dynamic>>.from(res as List);
+                } catch (_) { return []; }
+              }
+
+              // Messages envoyes par un user
+              Future<List<Map<String,dynamic>>> getMessagesSent(String userId) async {
+                try {
+                  final res = await _sb.from('messages')
+                      .select()
+                      .eq('expediteur_id', userId)
+                      .order('created_at', ascending: false);
+                  return List<Map<String,dynamic>>.from(res as List);
+                } catch (_) { return []; }
+              }
+
+              // Messages recus
+              Future<List<Map<String,dynamic>>> getMessagesRecus({String? userId, String? commune}) async {
+                try {
+                  final res = await _sb.from('messages')
+                      .select()
+                      .or('destinataire_id.eq.${userId ?? ""},commune.eq.${commune ?? ""}')
+                      .order('created_at', ascending: false);
+                  return List<Map<String,dynamic>>.from(res as List);
+                } catch (_) { return []; }
+              }
+
+              // Envoyer message a un agent
+              Future<void> envoyerMessage({required String expediteurId, required String destinataireId, required String contenu}) async {
+                await _sb.from('messages').insert({
+                  'expediteur_id': expediteurId,
+                  'destinataire_id': destinataireId,
+                  'contenu': contenu,
+                });
+              }
+
+              // Broadcast a une commune
+              Future<void> envoyerBroadcast({required String expediteurId, required String commune, required String contenu}) async {
+                await _sb.from('messages').insert({
+                  'expediteur_id': expediteurId,
+                  'commune': commune,
+                  'contenu': contenu,
+                });
+              }
+
+              // Update last seen
+              Future<void> updateLastSeen(String userId) async {
+                try {
+                  await _sb.from('utilisateurs')
+                      .update({'last_seen': DateTime.now().toIso8601String()})
+                      .eq('id', userId);
+                } catch (_) {}
+              }
+
           class OfflineService {
             static const _keySnapshots = 'offline_snapshots';
             static const _keyPv = 'offline_pv';
@@ -1226,6 +1287,119 @@ jobs:
             fi
           done
 
+          # -- validation_screen.dart ---------------------------
+          cat > lib/screens/superviseur/validation_screen.dart << 'DARTEOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+          import '../../models/models.dart';
+
+          class ValidationScreen extends StatefulWidget {
+            final String? commune;
+            const ValidationScreen({super.key, this.commune});
+            @override State<ValidationScreen> createState() => _ValidationScreenState();
+          }
+          class _ValidationScreenState extends State<ValidationScreen> {
+            final _data = DataService();
+            List<Map<String,dynamic>> _items = [];
+            bool _loading = true;
+
+            @override void initState() { super.initState(); _charger(); }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final res = await _data.getPvResults();
+                setState(() { _items = res.where((r) => r.statut == 'soumis').toList(); });
+              } finally { setState(() => _loading = false); }
+            }
+
+            @override Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator());
+              if (_items.isEmpty) return const Center(child: Text('Aucun PV en attente de validation'));
+              return RefreshIndicator(
+                onRefresh: _charger,
+                child: ListView.builder(
+                  itemCount: _items.length,
+                  itemBuilder: (ctx, i) {
+                    final pv = _items[i];
+                    return Card(
+                      margin: const EdgeInsets.all(8),
+                      child: ListTile(
+                        title: Text('Bureau: ${pv.bureauId ?? ""}'),
+                        subtitle: Text('Votants: ${pv.votants} | Voix A: ${pv.voixA} | Voix B: ${pv.voixB}'),
+                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                          IconButton(icon: const Icon(Icons.check_circle, color: Colors.green),
+                            onPressed: () async {
+                              final uid = await _data.getUserId() ?? '';
+                              await _data.validerPv(pv.id!, uid);
+                              _charger();
+                            }),
+                          IconButton(icon: const Icon(Icons.cancel, color: Colors.red),
+                            onPressed: () async {
+                              final uid = await _data.getUserId() ?? '';
+                              await _data.rejeterPv(pv.id!, uid, 'Rejete');
+                              _charger();
+                            }),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
+          }
+          DARTEOF
+
+          # -- anomalies_screen.dart ----------------------------
+          cat > lib/screens/superviseur/anomalies_screen.dart << 'DARTEOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+
+          class AnomaliesScreen extends StatefulWidget {
+            final String? commune;
+            const AnomaliesScreen({super.key, this.commune});
+            @override State<AnomaliesScreen> createState() => _AnomaliesScreenState();
+          }
+          class _AnomaliesScreenState extends State<AnomaliesScreen> {
+            final _data = DataService();
+            List<Map<String,dynamic>> _items = [];
+            bool _loading = true;
+
+            @override void initState() { super.initState(); _charger(); }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final res = await _data.getAnomalies();
+                setState(() => _items = res);
+              } finally { setState(() => _loading = false); }
+            }
+
+            @override Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator());
+              if (_items.isEmpty) return const Center(child: Text('Aucune anomalie detectee'));
+              return RefreshIndicator(
+                onRefresh: _charger,
+                child: ListView.builder(
+                  itemCount: _items.length,
+                  itemBuilder: (ctx, i) {
+                    final a = _items[i];
+                    return Card(
+                      margin: const EdgeInsets.all(8),
+                      color: Colors.orange[50],
+                      child: ListTile(
+                        leading: const Icon(Icons.warning, color: Colors.orange),
+                        title: Text('Bureau: ${a['bureau_code'] ?? a['bureau_id'] ?? ""}'),
+                        subtitle: Text('${a['niveau_anomalie'] ?? ""}: ${a['description'] ?? "Anomalie detectee"}'),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
+          }
+          DARTEOF
+
           # Fix imports in dashboard files
           find lib/screens/superviseur -name "*.dart" | xargs sed -i \
             -e "s|import '../../services/auth_service.dart'|import '../../services/services.dart'|g" \
@@ -1299,6 +1473,7 @@ jobs:
           # Create dashboard_live.dart with all classes
           cat > lib/screens/superviseur/dashboard_live.dart << 'EOF'
           import 'package:flutter/material.dart';
+          import '../../models/models.dart';
           import 'package:fl_chart/fl_chart.dart';
           import '../../services/services.dart';
           import '../../utils/constants.dart';
