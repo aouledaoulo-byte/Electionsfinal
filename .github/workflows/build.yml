@@ -58,6 +58,7 @@ jobs:
           }
           CEOF
           echo "Projet Flutter créé avec Gradle propre" 
+          
 
       - name: Create dart files from base64
         run: |
@@ -89,6 +90,7 @@ jobs:
           mkdir -p lib/screens/superviseur
           echo 'aW1wb3J0ICdwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCc7CmltcG9ydCAnLi4vLi4vc2VydmljZXMvc2VydmljZXMuZGFydCc7CgpjbGFzcyBEb2N1bWVudHNTdXBlcnZpc2lvbiBleHRlbmRzIFN0YXRlZnVsV2lkZ2V0IHsKICBmaW5hbCBTdHJpbmc/IGNvbW11bmU7CiAgY29uc3QgRG9jdW1lbnRzU3VwZXJ2aXNpb24oe3N1cGVyLmtleSwgdGhpcy5jb21tdW5lfSk7CiAgQG92ZXJyaWRlIFN0YXRlPERvY3VtZW50c1N1cGVydmlzaW9uPiBjcmVhdGVTdGF0ZSgpID0+IF9Eb2N1bWVudHNTdXBlcnZpc2lvblN0YXRlKCk7Cn0KCmNsYXNzIF9Eb2N1bWVudHNTdXBlcnZpc2lvblN0YXRlIGV4dGVuZHMgU3RhdGU8RG9jdW1lbnRzU3VwZXJ2aXNpb24+IHsKICBmaW5hbCBfZGF0YSA9IERhdGFTZXJ2aWNlKCk7CiAgTGlzdDxNYXA8U3RyaW5nLGR5bmFtaWM+PiBfZG9jcyA9IFtdOwogIGJvb2wgX2xvYWRpbmcgPSB0cnVlOwogIFN0cmluZyBfZmlsdHJlID0gJ3RvdXMnOwogIFN0cmluZz8gX3VzZXJJZDsKCiAgQG92ZXJyaWRlIHZvaWQgaW5pdFN0YXRlKCkgeyBzdXBlci5pbml0U3RhdGUoKTsgX2luaXQoKTsgfQoKICBGdXR1cmU8dm9pZD4gX2luaXQoKSBhc3luYyB7CiAgICBfdXNlcklkID0gYXdhaXQgX2RhdGEuZ2V0VXNlcklkKCk7CiAgICBfY2hhcmdlcigpOwogIH0KCiAgRnV0dXJlPHZvaWQ+IF9jaGFyZ2VyKCkgYXN5bmMgewogICAgc2V0U3RhdGUoKCkgPT4gX2xvYWRpbmcgPSB0cnVlKTsKICAgIHRyeSB7CiAgICAgIGZpbmFsIHJlcyA9IGF3YWl0IF9kYXRhLmdldERvY3VtZW50c1N0YXR1cyhjb21tdW5lOiB3aWRnZXQuY29tbXVuZSk7CiAgICAgIHNldFN0YXRlKCgpID0+IF9kb2NzID0gcmVzKTsKICAgIH0gZmluYWxseSB7IHNldFN0YXRlKCgpID0+IF9sb2FkaW5nID0gZmFsc2UpOyB9CiAgfQoKICBMaXN0PE1hcDxTdHJpbmcsZHluYW1pYz4+IGdldCBfZmlsdGVyZWQgewogICAgaWYgKF9maWx0cmUgPT0gJ3RvdXMnKSByZXR1cm4gX2RvY3M7CiAgICByZXR1cm4gX2RvY3Mud2hlcmUoKGQpID0+IGRbJ3N0YXR1dF9kb2N1bWVudHMnXSA9PSBfZmlsdHJlKS50b0xpc3QoKTsKICB9CgogIEBvdmVycmlkZSBXaWRnZXQgYnVpbGQoQnVpbGRDb250ZXh0IGNvbnRleHQpIHsKICAgIGZpbmFsIHZhbGlkZXMgICA9IF9kb2NzLndoZXJlKChkKSA9PiBkWydkb2N1bWVudHNfdmFsaWRlcyddID09IHRydWUpLmxlbmd0aDsKICAgIGZpbmFsIHNvdW1pcyAgICA9IF9kb2NzLndoZXJlKChkKSA9PiBkWydzdGF0dXRfZG9jdW1lbnRzJ10gPT0gJ3NvdW1pcycpLmxlbmd0aDsKICAgIGZpbmFsIGVuQXR0ZW50ZSA9IF9kb2NzLndoZXJlKChkKSA9PiBkWydzdGF0dXRfZG9jdW1lbnRzJ10gPT0gJ2VuX2F0dGVudGUnKS5sZW5ndGg7CgogICAgcmV0dXJuIENvbHVtbihjaGlsZHJlbjogWwogICAgICBDb250YWluZXIoY29sb3I6IGNvbnN0IENvbG9yKDB4RkYxQjVFMjApLCBwYWRkaW5nOiBjb25zdCBFZGdlSW5zZXRzLmFsbCgxMiksCiAgICAgICAgY2hpbGQ6IFJvdyhtYWluQXhpc0FsaWdubWVudDogTWFpbkF4aXNBbGlnbm1lbnQuc3BhY2VBcm91bmQsIGNoaWxkcmVuOiBbCiAgICAgICAgICBfc3RhdCgnVG90YWwnLCBfZG9jcy5sZW5ndGgudG9TdHJpbmcoKSwgQ29sb3JzLndoaXRlKSwKICAgICAgICAgIF9zdGF0KCdTb3VtaXMnLCBzb3VtaXMudG9TdHJpbmcoKSwgQ29sb3JzLm9yYW5nZSksCiAgICAgICAgICBfc3RhdCgnVmFsaWRlcycsIHZhbGlkZXMudG9TdHJpbmcoKSwgQ29sb3JzLmdyZWVuQWNjZW50KSwKICAgICAgICAgIF9zdGF0KCdBdHRlbnRlJywgZW5BdHRlbnRlLnRvU3RyaW5nKCksIENvbG9ycy5ncmV5WzMwMF0hKSwKICAgICAgICBdKSksCiAgICAgIFNpbmdsZUNoaWxkU2Nyb2xsVmlldyhzY3JvbGxEaXJlY3Rpb246IEF4aXMuaG9yaXpvbnRhbCwKICAgICAgICBwYWRkaW5nOiBjb25zdCBFZGdlSW5zZXRzLnN5bW1ldHJpYyhob3Jpem9udGFsOiAxMiwgdmVydGljYWw6IDgpLAogICAgICAgIGNoaWxkOiBSb3coY2hpbGRyZW46IFsKICAgICAgICAgIGZvciAoZmluYWwgZiBpbiBbJ3RvdXMnLCdzb3VtaXMnLCd2YWxpZGUnLCdlbl9hdHRlbnRlJ10pCiAgICAgICAgICAgIFBhZGRpbmcocGFkZGluZzogY29uc3QgRWRnZUluc2V0cy5vbmx5KHJpZ2h0OiA4KSwgY2hpbGQ6IENob2ljZUNoaXAoCiAgICAgICAgICAgICAgbGFiZWw6IFRleHQoZiA9PSAnZW5fYXR0ZW50ZScgPyAnRW4gYXR0ZW50ZScgOiBmID09ICd2YWxpZGUnID8gJ1ZhbGlkZXMnIDoKICAgICAgICAgICAgICAgIGZbMF0udG9VcHBlckNhc2UoKSArIGYuc3Vic3RyaW5nKDEpKSwKICAgICAgICAgICAgICBzZWxlY3RlZDogX2ZpbHRyZSA9PSBmLAogICAgICAgICAgICAgIHNlbGVjdGVkQ29sb3I6IGNvbnN0IENvbG9yKDB4RkYxQjVFMjApLAogICAgICAgICAgICAgIGxhYmVsU3R5bGU6IFRleHRTdHlsZShjb2xvcjogX2ZpbHRyZSA9PSBmID8gQ29sb3JzLndoaXRlIDogQ29sb3JzLmJsYWNrKSwKICAgICAgICAgICAgICBvblNlbGVjdGVkOiAoXykgPT4gc2V0U3RhdGUoKCkgPT4gX2ZpbHRyZSA9IGYpKSksCiAgICAgICAgXSkpLAogICAgICBFeHBhbmRlZChjaGlsZDogUmVmcmVzaEluZGljYXRvcihvblJlZnJlc2g6IF9jaGFyZ2VyLAogICAgICAgIGNoaWxkOiBfbG9hZGluZyA/IGNvbnN0IENlbnRlcihjaGlsZDogQ2lyY3VsYXJQcm9ncmVzc0luZGljYXRvcigpKQogICAgICAgICAgOiBfZmlsdGVyZWQuaXNFbXB0eSA/IGNvbnN0IENlbnRlcihjaGlsZDogVGV4dCgnQXVjdW4gZG9jdW1lbnQnKSkKICAgICAgICAgIDogTGlzdFZpZXcuYnVpbGRlcigKICAgICAgICAgICAgICBwYWRkaW5nOiBjb25zdCBFZGdlSW5zZXRzLnN5bW1ldHJpYyhob3Jpem9udGFsOiAxMiksCiAgICAgICAgICAgICAgaXRlbUNvdW50OiBfZmlsdGVyZWQubGVuZ3RoLAogICAgICAgICAgICAgIGl0ZW1CdWlsZGVyOiAoY3R4LCBpKSB7CiAgICAgICAgICAgICAgICBmaW5hbCBkID0gX2ZpbHRlcmVkW2ldOwogICAgICAgICAgICAgICAgZmluYWwgc3RhdHV0ID0gZFsnc3RhdHV0X2RvY3VtZW50cyddID8/ICdlbl9hdHRlbnRlJzsKICAgICAgICAgICAgICAgIGZpbmFsIHZhbGlkZSA9IGRbJ2RvY3VtZW50c192YWxpZGVzJ10gPT0gdHJ1ZTsKICAgICAgICAgICAgICAgIGZpbmFsIGNvbG9yID0gdmFsaWRlID8gQ29sb3JzLmdyZWVuIDogc3RhdHV0ID09ICdzb3VtaXMnID8gQ29sb3JzLm9yYW5nZSA6IENvbG9ycy5ncmV5OwogICAgICAgICAgICAgICAgcmV0dXJuIENhcmQobWFyZ2luOiBjb25zdCBFZGdlSW5zZXRzLm9ubHkoYm90dG9tOiA4KSwKICAgICAgICAgICAgICAgICAgc2hhcGU6IFJvdW5kZWRSZWN0YW5nbGVCb3JkZXIoCiAgICAgICAgICAgICAgICAgICAgc2lkZTogQm9yZGVyU2lkZShjb2xvcjogY29sb3Iud2l0aE9wYWNpdHkoMC40KSksCiAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiBCb3JkZXJSYWRpdXMuY2lyY3VsYXIoMTApKSwKICAgICAgICAgICAgICAgICAgY2hpbGQ6IEV4cGFuc2lvblRpbGUoCiAgICAgICAgICAgICAgICAgICAgbGVhZGluZzogQ2lyY2xlQXZhdGFyKGJhY2tncm91bmRDb2xvcjogY29sb3Iud2l0aE9wYWNpdHkoMC4xNSksCiAgICAgICAgICAgICAgICAgICAgICBjaGlsZDogSWNvbih2YWxpZGUgPyBJY29ucy52ZXJpZmllZCA6IHN0YXR1dCA9PSAnc291bWlzJyA/CiAgICAgICAgICAgICAgICAgICAgICAgIEljb25zLnBlbmRpbmcgOiBJY29ucy5ob3VyZ2xhc3NfZW1wdHksIGNvbG9yOiBjb2xvciwgc2l6ZTogMjApKSwKICAgICAgICAgICAgICAgICAgICB0aXRsZTogVGV4dCgnJHtkWydjb2RlJ119IC0gJHtkWydjZW50cmUnXSA/PyAnJ30nLAogICAgICAgICAgICAgICAgICAgICAgc3R5bGU6IGNvbnN0IFRleHRTdHlsZShmb250V2VpZ2h0OiBGb250V2VpZ2h0LmJvbGQsIGZvbnRTaXplOiAxMykpLAogICAgICAgICAgICAgICAgICAgIHN1YnRpdGxlOiBUZXh0KCcke2RbJ2FnZW50X25vbSddID8/IGRbJ2FnZW50X2NvZGUnXSA/PyAnTi9BJ30gfCAke2RbJ2NvbW11bmUnXSA/PyAnJ30nLAogICAgICAgICAgICAgICAgICAgICAgc3R5bGU6IGNvbnN0IFRleHRTdHlsZShmb250U2l6ZTogMTEpKSwKICAgICAgICAgICAgICAgICAgICBjaGlsZHJlbjogW1BhZGRpbmcocGFkZGluZzogY29uc3QgRWRnZUluc2V0cy5mcm9tTFRSQigxNiwwLDE2LDEyKSwgY2hpbGQ6IENvbHVtbihjaGlsZHJlbjogWwogICAgICAgICAgICAgICAgICAgICAgX2RvY1JvdygnT3JkcmVzIGRlIG1pc3Npb24nLCBkWydvcmRyZV9taXNzaW9uJ10/LnRvU3RyaW5nKCkgPz8gJzAnLAogICAgICAgICAgICAgICAgICAgICAgICBkWydvcmRyZV9taXNzaW9uX3Bob3RvJ10sIGRbJ2FfcGhvdG9fb20nXSA9PSB0cnVlKSwKICAgICAgICAgICAgICAgICAgICAgIGNvbnN0IERpdmlkZXIoKSwKICAgICAgICAgICAgICAgICAgICAgIF9kb2NSb3coJ09yZG9ubmFuY2VzJywgZFsnb3Jkb25uYW5jZSddPy50b1N0cmluZygpID8/ICcwJywKICAgICAgICAgICAgICAgICAgICAgICAgZFsnb3Jkb25uYW5jZV9waG90byddLCBkWydhX3Bob3RvX29yZCddID09IHRydWUpLAogICAgICAgICAgICAgICAgICAgICAgY29uc3QgU2l6ZWRCb3goaGVpZ2h0OiAxMiksCiAgICAgICAgICAgICAgICAgICAgICBpZiAoc3RhdHV0ID09ICdzb3VtaXMnICYmICF2YWxpZGUpIEVsZXZhdGVkQnV0dG9uLmljb24oCiAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlOiBFbGV2YXRlZEJ1dHRvbi5zdHlsZUZyb20oYmFja2dyb3VuZENvbG9yOiBDb2xvcnMuZ3JlZW4sCiAgICAgICAgICAgICAgICAgICAgICAgICAgZm9yZWdyb3VuZENvbG9yOiBDb2xvcnMud2hpdGUsIG1pbmltdW1TaXplOiBjb25zdCBTaXplKGRvdWJsZS5pbmZpbml0eSwgNDQpKSwKICAgICAgICAgICAgICAgICAgICAgICAgaWNvbjogY29uc3QgSWNvbihJY29ucy52ZXJpZmllZCksCiAgICAgICAgICAgICAgICAgICAgICAgIGxhYmVsOiBjb25zdCBUZXh0KCdWYWxpZGVyIGxlcyBkb2N1bWVudHMnKSwKICAgICAgICAgICAgICAgICAgICAgICAgb25QcmVzc2VkOiAoKSBhc3luYyB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgZmluYWwgb2sgPSBhd2FpdCBfZGF0YS52YWxpZGVyRG9jdW1lbnRzKGRbJ2lkJ10udG9TdHJpbmcoKSwgX3VzZXJJZCA/PyAnJyk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgaWYgKCFtb3VudGVkKSByZXR1cm47CiAgICAgICAgICAgICAgICAgICAgICAgICAgU2NhZmZvbGRNZXNzZW5nZXIub2YoY29udGV4dCkuc2hvd1NuYWNrQmFyKFNuYWNrQmFyKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY29udGVudDogVGV4dChvayA/ICdEb2N1bWVudHMgdmFsaWRlcyAhJyA6ICdFcnJldXInKSwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogb2sgPyBDb2xvcnMuZ3JlZW4gOiBDb2xvcnMucmVkKSk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgaWYgKG9rKSBfY2hhcmdlcigpOwogICAgICAgICAgICAgICAgICAgICAgICB9KSwKICAgICAgICAgICAgICAgICAgICAgIGlmICh2YWxpZGUpIENvbHVtbihjaGlsZHJlbjogWwogICAgICAgICAgICAgICAgICAgICAgICBjb25zdCBJY29uKEljb25zLnZlcmlmaWVkLCBjb2xvcjogQ29sb3JzLmdyZWVuLCBzaXplOiAzMiksCiAgICAgICAgICAgICAgICAgICAgICAgIFRleHQoJ1ZhbGlkZSBwYXIgJHtkWydkb2N1bWVudHNfdmFsaWRlc19wYXInXSA/PyAnc3VwZXJ2aXNldXInfScsCiAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU6IGNvbnN0IFRleHRTdHlsZShjb2xvcjogQ29sb3JzLmdyZWVuLCBmb250V2VpZ2h0OiBGb250V2VpZ2h0LmJvbGQpKSwKICAgICAgICAgICAgICAgICAgICAgIF0pLAogICAgICAgICAgICAgICAgICAgIF0pKV0sCiAgICAgICAgICAgICAgICAgICkpOwogICAgICAgICAgICAgIH0pKSksCiAgICBdKTsKICB9CgogIFdpZGdldCBfZG9jUm93KFN0cmluZyBsYWJlbCwgU3RyaW5nIGNvdW50LCBkeW5hbWljIHBob3RvVXJsLCBib29sIGhhc1Bob3RvKSB7CiAgICByZXR1cm4gUGFkZGluZyhwYWRkaW5nOiBjb25zdCBFZGdlSW5zZXRzLnN5bW1ldHJpYyh2ZXJ0aWNhbDogNCksIGNoaWxkOiBSb3coY2hpbGRyZW46IFsKICAgICAgRXhwYW5kZWQoY2hpbGQ6IENvbHVtbihjcm9zc0F4aXNBbGlnbm1lbnQ6IENyb3NzQXhpc0FsaWdubWVudC5zdGFydCwgY2hpbGRyZW46IFsKICAgICAgICBUZXh0KGxhYmVsLCBzdHlsZTogY29uc3QgVGV4dFN0eWxlKGZvbnRXZWlnaHQ6IEZvbnRXZWlnaHQuYm9sZCwgZm9udFNpemU6IDEyKSksCiAgICAgICAgVGV4dCgnTm9tYnJlOiAkY291bnQnLCBzdHlsZTogY29uc3QgVGV4dFN0eWxlKGZvbnRTaXplOiAxMiwgY29sb3I6IENvbG9ycy5ncmV5KSksCiAgICAgIF0pKSwKICAgICAgaWYgKGhhc1Bob3RvICYmIHBob3RvVXJsICE9IG51bGwpCiAgICAgICAgVGV4dEJ1dHRvbi5pY29uKGljb246IGNvbnN0IEljb24oSWNvbnMudmlzaWJpbGl0eSwgc2l6ZTogMTYpLAogICAgICAgICAgbGFiZWw6IGNvbnN0IFRleHQoJ1Bob3RvJywgc3R5bGU6IFRleHRTdHlsZShmb250U2l6ZTogMTIpKSwKICAgICAgICAgIG9uUHJlc3NlZDogKCkgPT4gX3ZvaXJQaG90byhwaG90b1VybC50b1N0cmluZygpKSksCiAgICAgIGlmICghaGFzUGhvdG8pIGNvbnN0IFRleHQoJ1BhcyBkZSBwaG90bycsIHN0eWxlOiBUZXh0U3R5bGUoZm9udFNpemU6IDExLCBjb2xvcjogQ29sb3JzLmdyZXkpKSwKICAgIF0pKTsKICB9CgogIFdpZGdldCBfc3RhdChTdHJpbmcgbGFiZWwsIFN0cmluZyB2YWwsIENvbG9yIGNvbG9yKSA9PiBDb2x1bW4oY2hpbGRyZW46IFsKICAgIFRleHQodmFsLCBzdHlsZTogVGV4dFN0eWxlKGNvbG9yOiBjb2xvciwgZm9udFdlaWdodDogRm9udFdlaWdodC5ib2xkLCBmb250U2l6ZTogMTgpKSwKICAgIFRleHQobGFiZWwsIHN0eWxlOiBUZXh0U3R5bGUoY29sb3I6IGNvbG9yLndpdGhPcGFjaXR5KDAuOCksIGZvbnRTaXplOiAxMCkpLAogIF0pOwoKICB2b2lkIF92b2lyUGhvdG8oU3RyaW5nIHVybCkgewogICAgc2hvd0RpYWxvZyhjb250ZXh0OiBjb250ZXh0LCBidWlsZGVyOiAoY3R4KSA9PiBEaWFsb2coY2hpbGQ6IENvbHVtbihtYWluQXhpc1NpemU6IE1haW5BeGlzU2l6ZS5taW4sIGNoaWxkcmVuOiBbCiAgICAgIEFwcEJhcih0aXRsZTogY29uc3QgVGV4dCgnUGhvdG8gZG9jdW1lbnQnKSwgYmFja2dyb3VuZENvbG9yOiBjb25zdCBDb2xvcigweEZGMUI1RTIwKSwKICAgICAgICBmb3JlZ3JvdW5kQ29sb3I6IENvbG9ycy53aGl0ZSwKICAgICAgICBsZWFkaW5nOiBJY29uQnV0dG9uKGljb246IGNvbnN0IEljb24oSWNvbnMuY2xvc2UpLCBvblByZXNzZWQ6ICgpID0+IE5hdmlnYXRvci5wb3AoY3R4KSkpLAogICAgICBJbWFnZS5uZXR3b3JrKHVybCwgZml0OiBCb3hGaXQuY29udGFpbiwKICAgICAgICBlcnJvckJ1aWxkZXI6IChfLCBfXywgX19fKSA9PiBjb25zdCBQYWRkaW5nKHBhZGRpbmc6IEVkZ2VJbnNldHMuYWxsKDIwKSwgY2hpbGQ6IFRleHQoJ0VycmV1ciBjaGFyZ2VtZW50JykpKSwKICAgIF0pKSk7CiAgfQp9Cg==' | base64 -d > lib/screens/superviseur/documents_supervision.dart
           echo 'Tous les fichiers Dart décodés'
+          
 
       - name: Create app icons
         run: |
@@ -105,6 +107,7 @@ jobs:
               with open(f'android/app/src/main/res/mipmap-{name}/ic_launcher.png','wb') as f: f.write(create_png(size))
           print('Icons created')
           " 
+          
 
       - name: Create Android files
         run: |
@@ -141,11 +144,12 @@ jobs:
           </manifest>
           AMEOF
           echo "Android configuré" 
+          
 
       - name: Create pubspec.yaml
         run: |
-          cat > pubspec.yaml << 'PEOF'
-          name: election
+          python3 -c "
+          content = '''name: election
           description: Application Election 2026 Djibouti
           publish_to: none
           version: 1.0.0+1
@@ -164,51 +168,29 @@ jobs:
             uses-material-design: true
             assets:
               - assets/images/
-          PEOF 
+          '''
+          with open('pubspec.yaml', 'w') as f:
+              f.write(content)
+          print('pubspec.yaml written')
+          " 
 
       - name: Create main.dart
         run: |
-          cat > lib/main.dart << 'MEOF'
-          import 'package:flutter/material.dart';
-          import 'package:supabase_flutter/supabase_flutter.dart';
-          import 'utils/constants.dart';
-          import 'screens/login_screen.dart';
-          
-          void main() async {
-            WidgetsFlutterBinding.ensureInitialized();
-            await Supabase.initialize(
-              url: AppConstants.supabaseUrl,
-              anonKey: AppConstants.supabaseAnonKey,
-            );
-            runApp(const ElectionApp());
-          }
-          
-          class ElectionApp extends StatelessWidget {
-            const ElectionApp({super.key});
-            @override Widget build(BuildContext context) {
-              return MaterialApp(
-                title: 'Election 2026',
-                debugShowCheckedModeBanner: false,
-                theme: ThemeData(
-                  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
-                  useMaterial3: true,
-                ),
-                home: const LoginScreen(),
-              );
-            }
-          }
-          MEOF 
+          echo 'aW1wb3J0ICdwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCc7CmltcG9ydCAncGFja2FnZTpzdXBhYmFzZV9mbHV0dGVyL3N1cGFiYXNlX2ZsdXR0ZXIuZGFydCc7CmltcG9ydCAndXRpbHMvY29uc3RhbnRzLmRhcnQnOwppbXBvcnQgJ3NjcmVlbnMvbG9naW5fc2NyZWVuLmRhcnQnOwoKdm9pZCBtYWluKCkgYXN5bmMgewogIFdpZGdldHNGbHV0dGVyQmluZGluZy5lbnN1cmVJbml0aWFsaXplZCgpOwogIGF3YWl0IFN1cGFiYXNlLmluaXRpYWxpemUoCiAgICB1cmw6IEFwcENvbnN0YW50cy5zdXBhYmFzZVVybCwKICAgIGFub25LZXk6IEFwcENvbnN0YW50cy5zdXBhYmFzZUFub25LZXksCiAgKTsKICBydW5BcHAoY29uc3QgRWxlY3Rpb25BcHAoKSk7Cn0KCmNsYXNzIEVsZWN0aW9uQXBwIGV4dGVuZHMgU3RhdGVsZXNzV2lkZ2V0IHsKICBjb25zdCBFbGVjdGlvbkFwcCh7c3VwZXIua2V5fSk7CiAgQG92ZXJyaWRlIFdpZGdldCBidWlsZChCdWlsZENvbnRleHQgY29udGV4dCkgewogICAgcmV0dXJuIE1hdGVyaWFsQXBwKAogICAgICB0aXRsZTogJ0VsZWN0aW9uIDIwMjYnLAogICAgICBkZWJ1Z1Nob3dDaGVja2VkTW9kZUJhbm5lcjogZmFsc2UsCiAgICAgIHRoZW1lOiBUaGVtZURhdGEoCiAgICAgICAgY29sb3JTY2hlbWU6IENvbG9yU2NoZW1lLmZyb21TZWVkKHNlZWRDb2xvcjogY29uc3QgQ29sb3IoMHhGRjFCNUUyMCkpLAogICAgICAgIHVzZU1hdGVyaWFsMzogdHJ1ZSwKICAgICAgKSwKICAgICAgaG9tZTogY29uc3QgTG9naW5TY3JlZW4oKSwKICAgICk7CiAgfQp9Cg==' | base64 -d > lib/main.dart
+          echo 'main.dart written'
 
       - name: Get Flutter dependencies
         run: |
           flutter pub get
+          
 
       - name: Build APK
         run: |
           flutter build apk --release --no-shrink
+          
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: election-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: 'election-apk'
+          path: 'build/app/outputs/flutter-apk/app-release.apk'
