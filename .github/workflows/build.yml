@@ -1073,7 +1073,6 @@ jobs:
                 decoration: InputDecoration(labelText: label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))));
           }
           DETEOF
-          EOF
 
           # Copy dashboard files from uploaded versions (they have correct content)
           # but fix their imports
