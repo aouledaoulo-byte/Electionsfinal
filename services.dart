@@ -31,6 +31,7 @@ class AuthService {
       await prefs.setString('user_role', user.role);
       await prefs.setString('user_nom', user.nom);
       if (user.region != null) await prefs.setString('user_region', user.region!);
+      if (user.commune != null) await prefs.setString('user_commune', user.commune!);
 
       return user;
     } catch (e) {
@@ -46,6 +47,11 @@ class AuthService {
   Future<String?> getUserId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_id');
+  }
+
+  Future<String?> getUserCommune() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_commune');
   }
 
   Future<String?> getUserNom() async {
@@ -201,7 +207,42 @@ class DataService {
     return List<Map<String, dynamic>>.from(res);
   }
 
-  Future<List<Map<String, dynamic>>> getLiveCoverage() async {
+  Future<List<Map<String, dynamic>>> getLiveCoverage({String? commune}) async {
+    if (commune != null && commune.isNotEmpty) {
+      // Filtrage par commune via requête directe
+      final bureaux = await _sb.from('bureaux').select('id').eq('commune', commune);
+      final ids = (bureaux as List).map((b) => b['id'].toString()).toList();
+      if (ids.isEmpty) return [];
+      final snaps = await _sb.from('turnout_snapshots')
+          .select('heure, votants, bureau_id')
+          .inFilter('bureau_id', ids)
+          .order('heure');
+      // Agréger par heure
+      final Map<int, Map<String, dynamic>> byHeure = {};
+      final totalBureaux = ids.length;
+      for (final s in snaps as List) {
+        final h = s['heure'] as int;
+        if (!byHeure.containsKey(h)) {
+          byHeure[h] = {'heure': h, 'nb_snapshots': 0, 'bureaux_actifs': <String>{}, 'total_votants': 0, 'total_bureaux': totalBureaux};
+        }
+        byHeure[h]!['nb_snapshots'] = (byHeure[h]!['nb_snapshots'] as int) + 1;
+        (byHeure[h]!['bureaux_actifs'] as Set<String>).add(s['bureau_id'].toString());
+        byHeure[h]!['total_votants'] = (byHeure[h]!['total_votants'] as int) + (s['votants'] as int? ?? 0);
+      }
+      return byHeure.values.map((h) {
+        final actifs = (h['bureaux_actifs'] as Set<String>).length;
+        return {
+          'heure': h['heure'],
+          'nb_snapshots': h['nb_snapshots'],
+          'bureaux_actifs': actifs,
+          'bureaux_valides': actifs,
+          'total_bureaux': h['total_bureaux'],
+          'moy_votants': actifs > 0 ? h['total_votants'] / actifs : 0,
+          'taux_participation': 0,
+          'pct_couverture': totalBureaux > 0 ? (actifs / totalBureaux * 100) : 0,
+        };
+      }).toList()..sort((a, b) => (a['heure'] as int).compareTo(b['heure'] as int));
+    }
     final res = await _sb.from('kpi_live_coverage_by_hour').select().order('heure');
     return List<Map<String, dynamic>>.from(res);
   }
