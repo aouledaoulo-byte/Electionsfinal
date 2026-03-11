@@ -515,7 +515,10 @@ jobs:
               } catch (_) {}
             }
 
-
+              Future<String?> getUserId() async {
+                final prefs = await SharedPreferences.getInstance();
+                return prefs.getString('user_id');
+              }
 
           }
 
@@ -1220,12 +1223,11 @@ jobs:
 
           EOF
           # Copier fichiers du repo vers les bons dossiers
-          for f in models.dart services.dart superviseur_home.dart dashboard_live.dart dashboard_national.dart agents_screen.dart; do
+          for f in models.dart superviseur_home.dart dashboard_live.dart dashboard_national.dart agents_screen.dart; do
             if [ -f "$f" ]; then
               case "$f" in
                 models.dart) cp "$f" lib/models/ ;;
-                services.dart) cp "$f" lib/services/ ;;
-                superviseur_home.dart|dashboard_live.dart|dashboard_national.dart|agents_screen.dart) cp "$f" lib/screens/superviseur/ ;;
+                          superviseur_home.dart|dashboard_live.dart|dashboard_national.dart|agents_screen.dart) cp "$f" lib/screens/superviseur/ ;;
               esac
               echo "Copie: $f"
             fi
