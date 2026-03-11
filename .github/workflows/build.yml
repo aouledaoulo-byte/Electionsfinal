@@ -542,8 +542,8 @@ jobs:
           # Add Uint8List import to services.dart
           sed -i '1s/^/import "dart:typed_data";\n/' lib/services/services.dart
 
-                - name: Create screen files
-                  run: |
+      - name: Create screen files
+        run: |
           # -- login_screen.dart --------------------------------
           cat > lib/screens/login_screen.dart << 'EOF'
           import 'package:flutter/material.dart';
@@ -1214,9 +1214,17 @@ jobs:
           }
 
           EOF
-          if [ -f dashboard_live.dart ]; then
-            mv dashboard_live.dart lib/screens/superviseur/
-          fi
+          # Copier fichiers du repo vers les bons dossiers
+          for f in models.dart services.dart superviseur_home.dart dashboard_live.dart dashboard_national.dart agents_screen.dart; do
+            if [ -f "$f" ]; then
+              case "$f" in
+                models.dart) cp "$f" lib/models/ ;;
+                services.dart) cp "$f" lib/services/ ;;
+                superviseur_home.dart|dashboard_live.dart|dashboard_national.dart|agents_screen.dart) cp "$f" lib/screens/superviseur/ ;;
+              esac
+              echo "Copie: $f"
+            fi
+          done
 
           # Fix imports in dashboard files
           find lib/screens/superviseur -name "*.dart" | xargs sed -i \
@@ -1833,8 +1841,8 @@ jobs:
           }
           EOF
 
-                - name: Create app icons
-                  run: |
+      - name: Create app icons
+        run: |
           sudo apt-get install -y imagemagick 2>/dev/null || true
           for size in 48 72 96 144 192; do
             case $size in
@@ -1890,8 +1898,8 @@ jobs:
           PYEOF
           done
 
-                - name: Create Android files
-                  run: |
+      - name: Create Android files
+        run: |
           cat > android/app/src/main/AndroidManifest.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -1999,8 +2007,8 @@ jobs:
           dependencies { implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version" }
           EOF
 
-                - name: Create pubspec.yaml
-                  run: |
+      - name: Create pubspec.yaml
+        run: |
           cat > pubspec.yaml << 'EOF'
           name: election
           description: Application de suivi electoral
@@ -2023,15 +2031,15 @@ jobs:
               - assets/images/
           EOF
 
-                - name: Get Flutter dependencies
-                  run: flutter pub get
+      - name: Get Flutter dependencies
+        run: flutter pub get
 
-                - name: Build APK
-                  run: flutter build apk --release --no-shrink
+      - name: Build APK
+        run: flutter build apk --release --no-shrink
 
-                - name: Upload APK
-                  uses: actions/upload-artifact@v4
-                  with:
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
           name: election-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
