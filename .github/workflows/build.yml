@@ -834,8 +834,6 @@ jobs:
           import 'dashboard_national.dart';
           import 'dashboard_live.dart';
           import 'agents_screen.dart';
-          import 'validation_screen.dart';
-          import 'anomalies_screen.dart';
 
           class SuperviseurHome extends StatefulWidget {
             const SuperviseurHome({super.key});
@@ -1238,6 +1236,140 @@ jobs:
           echo "aW1wb3J0ICJwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCI7CmltcG9ydCAiLi4vLi4vc2VydmljZXMvc2VydmljZXMuZGFydCI7CmNsYXNzIEFub21hbGllc1NjcmVlbiBleHRlbmRzIFN0YXRlZnVsV2lkZ2V0IHsKICBmaW5hbCBTdHJpbmc/IGNvbW11bmU7CiAgY29uc3QgQW5vbWFsaWVzU2NyZWVuKHtzdXBlci5rZXksIHRoaXMuY29tbXVuZX0pOwogIEBvdmVycmlkZSBTdGF0ZTxBbm9tYWxpZXNTY3JlZW4+IGNyZWF0ZVN0YXRlKCkgPT4gX0Fub21hbGllc1NjcmVlblN0YXRlKCk7Cn0KY2xhc3MgX0Fub21hbGllc1NjcmVlblN0YXRlIGV4dGVuZHMgU3RhdGU8QW5vbWFsaWVzU2NyZWVuPiB7CiAgZmluYWwgX2RhdGEgPSBEYXRhU2VydmljZSgpOwogIExpc3Q8TWFwPFN0cmluZyxkeW5hbWljPj4gX2l0ZW1zID0gW107CiAgYm9vbCBfbG9hZGluZyA9IHRydWU7CiAgQG92ZXJyaWRlIHZvaWQgaW5pdFN0YXRlKCkgeyBzdXBlci5pbml0U3RhdGUoKTsgX2NoYXJnZXIoKTsgfQogIEZ1dHVyZTx2b2lkPiBfY2hhcmdlcigpIGFzeW5jIHsKICAgIHNldFN0YXRlKCgpID0+IF9sb2FkaW5nID0gdHJ1ZSk7CiAgICB0cnkgeyBmaW5hbCByZXMgPSBhd2FpdCBfZGF0YS5nZXRBbm9tYWxpZXMoKTsgc2V0U3RhdGUoKCkgPT4gX2l0ZW1zID0gcmVzKTsgfQogICAgZmluYWxseSB7IHNldFN0YXRlKCgpID0+IF9sb2FkaW5nID0gZmFsc2UpOyB9CiAgfQogIEBvdmVycmlkZSBXaWRnZXQgYnVpbGQoQnVpbGRDb250ZXh0IGNvbnRleHQpIHsKICAgIGlmIChfbG9hZGluZykgcmV0dXJuIGNvbnN0IENlbnRlcihjaGlsZDogQ2lyY3VsYXJQcm9ncmVzc0luZGljYXRvcigpKTsKICAgIGlmIChfaXRlbXMuaXNFbXB0eSkgcmV0dXJuIGNvbnN0IENlbnRlcihjaGlsZDogVGV4dCgiQXVjdW5lIGFub21hbGllIikpOwogICAgcmV0dXJuIFJlZnJlc2hJbmRpY2F0b3Iob25SZWZyZXNoOiBfY2hhcmdlciwKICAgICAgY2hpbGQ6IExpc3RWaWV3LmJ1aWxkZXIoaXRlbUNvdW50OiBfaXRlbXMubGVuZ3RoLCBpdGVtQnVpbGRlcjogKGN0eCwgaSkgewogICAgICAgIGZpbmFsIGEgPSBfaXRlbXNbaV07CiAgICAgICAgcmV0dXJuIENhcmQobWFyZ2luOiBjb25zdCBFZGdlSW5zZXRzLmFsbCg4KSwgY29sb3I6IENvbG9ycy5vcmFuZ2VbNTBdLAogICAgICAgICAgY2hpbGQ6IExpc3RUaWxlKGxlYWRpbmc6IGNvbnN0IEljb24oSWNvbnMud2FybmluZywgY29sb3I6IENvbG9ycy5vcmFuZ2UpLAogICAgICAgICAgICB0aXRsZTogVGV4dCgiQnVyZWF1OiAiICsgKGFbImJ1cmVhdV9jb2RlIl0/LnRvU3RyaW5nKCkgPz8gIiIpKSwKICAgICAgICAgICAgc3VidGl0bGU6IFRleHQoYVsibml2ZWF1X2Fub21hbGllIl0/LnRvU3RyaW5nKCkgPz8gIkFub21hbGllIiksCiAgICAgICAgICApKTsKICAgICAgfSkpOwogIH0KfQ==" | base64 -d > lib/screens/superviseur/anomalies_screen.dart
           echo 'Fichiers dart crees via base64'
 
+          # -- validation_screen.dart ---------------------------
+          cat > lib/screens/superviseur/validation_screen.dart << 'VEOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+
+          class ValidationScreen extends StatefulWidget {
+            final String? commune;
+            const ValidationScreen({super.key, this.commune});
+            @override State<ValidationScreen> createState() => _ValidationScreenState();
+          }
+          class _ValidationScreenState extends State<ValidationScreen> {
+            final _data = DataService();
+            List<Map<String,dynamic>> _items = [];
+            bool _loading = true;
+
+            @override void initState() { super.initState(); _charger(); }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final res = await _data.getPvResults();
+                final soumis = (res as List).where((r) => r['statut'] == 'soumis').toList();
+                setState(() => _items = soumis.cast<Map<String,dynamic>>());
+              } finally { setState(() => _loading = false); }
+            }
+
+            @override Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)));
+              if (_items.isEmpty) return const Center(child: Text('Aucun PV en attente'));
+              return RefreshIndicator(
+                onRefresh: _charger,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _items.length,
+                  itemBuilder: (ctx, i) {
+                    final pv = _items[i];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text('Bureau: ${pv['bureau_id'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          Text('Votants: ${pv['votants']} | Voix A: ${pv['voix_a']} | Voix B: ${pv['voix_b']} | Nuls: ${pv['nuls']}'),
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            Expanded(child: ElevatedButton.icon(
+                              icon: const Icon(Icons.check_circle, size: 18),
+                              label: const Text('Valider'),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
+                              onPressed: () async {
+                                final uid = await _data.getUserId() ?? '';
+                                await _data.validerPv(pv['id'].toString(), uid);
+                                _charger();
+                              },
+                            )),
+                            const SizedBox(width: 8),
+                            Expanded(child: ElevatedButton.icon(
+                              icon: const Icon(Icons.cancel, size: 18),
+                              label: const Text('Rejeter'),
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                              onPressed: () async {
+                                final uid = await _data.getUserId() ?? '';
+                                await _data.rejeterPv(pv['id'].toString(), uid, 'Rejete par superviseur');
+                                _charger();
+                              },
+                            )),
+                          ]),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
+          }
+          VEOF
+
+          # -- anomalies_screen.dart ----------------------------
+          cat > lib/screens/superviseur/anomalies_screen.dart << 'AEOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+
+          class AnomaliesScreen extends StatefulWidget {
+            final String? commune;
+            const AnomaliesScreen({super.key, this.commune});
+            @override State<AnomaliesScreen> createState() => _AnomaliesScreenState();
+          }
+          class _AnomaliesScreenState extends State<AnomaliesScreen> {
+            final _data = DataService();
+            List<Map<String,dynamic>> _items = [];
+            bool _loading = true;
+
+            @override void initState() { super.initState(); _charger(); }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final res = await _data.getAnomalies();
+                setState(() => _items = (res as List).cast<Map<String,dynamic>>());
+              } finally { setState(() => _loading = false); }
+            }
+
+            @override Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)));
+              if (_items.isEmpty) return const Center(child: Text('Aucune anomalie detectee'));
+              return RefreshIndicator(
+                onRefresh: _charger,
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _items.length,
+                  itemBuilder: (ctx, i) {
+                    final a = _items[i];
+                    final niveau = a['niveau_anomalie'] ?? '';
+                    final color = niveau == 'CRITIQUE' ? Colors.red : Colors.orange;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(color: color.withOpacity(0.5)),
+                        borderRadius: BorderRadius.circular(10)),
+                      child: ListTile(
+                        leading: Icon(niveau == 'CRITIQUE' ? Icons.error : Icons.warning, color: color),
+                        title: Text('Bureau: ${a['bureau_code'] ?? a['bureau_id'] ?? ''}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                        subtitle: Text('$niveau: ${a['description'] ?? 'Anomalie detectee'}',
+                          style: TextStyle(color: color, fontSize: 12)),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
+          }
+          AEOF
+
           # Fix imports in dashboard files
           find lib/screens/superviseur -name "*.dart" | xargs sed -i \
             -e "s|import '../../services/auth_service.dart'|import '../../services/services.dart'|g" \
@@ -1465,332 +1597,8 @@ jobs:
           // ============================================================
           //  VALIDATION SCREEN -- Valider/Rejeter PV et releves
           // ============================================================
-          class ValidationScreen extends StatefulWidget {
-            const ValidationScreen({super.key});
-            @override
-            State<ValidationScreen> createState() => _ValidationScreenState();
-          }
 
-          class _ValidationScreenState extends State<ValidationScreen>
-              with SingleTickerProviderStateMixin {
-            late TabController _tabs;
-            final _data = DataService();
-            List<Map<String, dynamic>> _pvSoumis = [];
-            List<TurnoutSnapshot> _snapsSoumis = [];
-            List<Bureau> _bureaux = [];
-            bool _loading = true;
-            String _superviseurId = '';
 
-            @override
-            void initState() {
-              super.initState();
-              _tabs = TabController(length: 2, vsync: this);
-              _charger();
-            }
-
-            Future<void> _charger() async {
-              _superviseurId = await AuthService().getUserId() ?? '';
-              setState(() => _loading = true);
-
-              final pvAll = await _data.getAllPv();
-              final bAll  = await _data.getAllBureaux();
-
-              // Filtrer PV soumis
-              final pvSoumis = pvAll.where((p) => p.statut == PvStatut.soumis).toList();
-              final bureauMap = {for (var b in bAll) b.id: b};
-
-              setState(() {
-                _pvSoumis = pvSoumis.map((p) => {
-                  'pv': p,
-                  'bureau': bureauMap[p.bureauId],
-                }).toList();
-                _bureaux = bAll;
-                _loading = false;
-              });
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                body: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : Column(children: [
-                        TabBar(
-                          controller: _tabs,
-                          tabs: [
-                            Tab(text: 'PV (${_pvSoumis.length})'),
-                            const Tab(text: 'Releves LIVE'),
-                          ],
-                          labelColor: const Color(0xFF1B5E20),
-                          indicatorColor: const Color(0xFF1B5E20),
-                        ),
-                        Expanded(child: TabBarView(
-                          controller: _tabs,
-                          children: [_tabPv(), _tabSnapshots()],
-                        )),
-                      ]),
-                floatingActionButton: FloatingActionButton(
-                  onPressed: _charger,
-                  backgroundColor: const Color(0xFF1B5E20),
-                  child: const Icon(Icons.refresh, color: Colors.white),
-                ),
-              );
-            }
-
-            Widget _tabPv() {
-              if (_pvSoumis.isEmpty) {
-                return const Center(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle, size: 64, color: Colors.green),
-                    SizedBox(height: 12),
-                    Text('Tous les PV sont traites', style: TextStyle(color: Colors.grey)),
-                  ],
-                ));
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: _pvSoumis.length,
-                itemBuilder: (_, i) {
-                  final item = _pvSoumis[i];
-                  final pv = item['pv'] as PvResult;
-                  final b  = item['bureau'] as Bureau?;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(b?.nom ?? '--',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        Text('${b?.region ?? ''} - ${b?.commune ?? ''} - ${b?.centre ?? ''}',
-                            style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                        const Divider(height: 16),
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                          _pvStat('Votants', pv.votants),
-                          _pvStat('Nuls', pv.nuls),
-                          _pvStat('A', pv.voixA),
-                          _pvStat('B', pv.voixB),
-                        ]),
-                        // Verification coherence
-                        if (pv.votants != pv.nuls + pv.voixA + pv.voixB)
-                          Container(
-                            margin: const EdgeInsets.only(top: 8),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                                color: Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(8)),
-                            child: Row(children: [
-                              const Icon(Icons.warning, color: Colors.red, size: 16),
-                              const SizedBox(width: 6),
-                              Text('INCOHERENCE : ${pv.votants} != ${pv.nuls}+${pv.voixA}+${pv.voixB}',
-                                  style: const TextStyle(color: Colors.red, fontSize: 12)),
-                            ]),
-                          ),
-                        if (pv.photoUrl != null) Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(children: [
-                            const Icon(Icons.image, size: 14, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            const Text('Photo PV disponible',
-                                style: TextStyle(fontSize: 11, color: Colors.grey)),
-                          ]),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(children: [
-                          Expanded(child: OutlinedButton.icon(
-                            onPressed: () => _rejeterPv(pv),
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            label: const Text('Rejeter', style: TextStyle(color: Colors.red)),
-                            style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
-                          )),
-                          const SizedBox(width: 8),
-                          Expanded(child: ElevatedButton.icon(
-                            onPressed: () => _validerPv(pv.id!),
-                            icon: const Icon(Icons.check_circle),
-                            label: const Text('Valider'),
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                          )),
-                        ]),
-                      ]),
-                    ),
-                  );
-                },
-              );
-            }
-
-            Widget _pvStat(String label, int value) => Column(children: [
-              Text(value.toString(),
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
-            ]);
-
-            Widget _tabSnapshots() {
-              return const Center(
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.access_time, size: 48, color: Colors.grey),
-                  SizedBox(height: 12),
-                  Text('Validation des releves LIVE', style: TextStyle(color: Colors.grey)),
-                  SizedBox(height: 4),
-                  Text('Selectionnez un bureau pour valider',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ]),
-              );
-            }
-
-            Future<void> _validerPv(String pvId) async {
-              final ok = await _data.validerPv(pvId, _superviseurId);
-              if (!mounted) return;
-              if (ok) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('PV valide ?'), backgroundColor: Colors.green));
-                _charger();
-              }
-            }
-
-            Future<void> _rejeterPv(PvResult pv) async {
-              String note = '';
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('Rejeter le PV'),
-                  content: TextField(
-                    decoration: const InputDecoration(
-                        labelText: 'Motif du rejet', border: OutlineInputBorder()),
-                    onChanged: (v) => note = v,
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Annuler')),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      child: const Text('Rejeter'),
-                    ),
-                  ],
-                ),
-              );
-              if (confirm == true && pv.id != null) {
-                final ok = await _data.rejeterPv(pv.id!, note, _superviseurId);
-                if (!mounted) return;
-                if (ok) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('PV rejete'), backgroundColor: Colors.red));
-                  _charger();
-                }
-              }
-            }
-          }
-
-          // ============================================================
-          //  ANOMALIES SCREEN
-          // ============================================================
-          class AnomaliesScreen extends StatefulWidget {
-            const AnomaliesScreen({super.key});
-            @override
-            State<AnomaliesScreen> createState() => _AnomaliesScreenState();
-          }
-
-          class _AnomaliesScreenState extends State<AnomaliesScreen> {
-            final _data = DataService();
-            List<Map<String, dynamic>> _anomalies = [];
-            bool _loading = true;
-
-            @override
-            void initState() {
-              super.initState();
-              _charger();
-            }
-
-            Future<void> _charger() async {
-              setState(() => _loading = true);
-              final a = await _data.getAnomalies();
-              setState(() { _anomalies = a; _loading = false; });
-            }
-
-            @override
-            Widget build(BuildContext context) {
-              if (_loading) return const Center(child: CircularProgressIndicator());
-              if (_anomalies.isEmpty) {
-                return const Center(child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.verified_user, size: 64, color: Colors.green),
-                    SizedBox(height: 12),
-                    Text('Aucune anomalie detectee', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  ],
-                ));
-              }
-
-              final critiques = _anomalies.where((a) => a['niveau_anomalie'] == 'CRITIQUE').toList();
-              final warnings  = _anomalies.where((a) => a['niveau_anomalie'] == 'WARNING').toList();
-
-              return RefreshIndicator(
-                onRefresh: _charger,
-                child: ListView(
-                  padding: const EdgeInsets.all(12),
-                  children: [
-                    if (critiques.isNotEmpty) ...[
-                      _headerSection(' CRITIQUE (${critiques.length})', Colors.red),
-                      ...critiques.map((a) => _anomalieCard(a, Colors.red)),
-                    ],
-                    if (warnings.isNotEmpty) ...[
-                      _headerSection('[!] WARNING (${warnings.length})', Colors.orange),
-                      ...warnings.map((a) => _anomalieCard(a, Colors.orange)),
-                    ],
-                  ],
-                ),
-              );
-            }
-
-            Widget _headerSection(String title, Color color) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 15)),
-            );
-
-            Widget _anomalieCard(Map<String, dynamic> a, Color color) {
-              final List<String> details = [];
-              if (a['anomalie_votants_sup_inscrits'] == true)
-                details.add('Votants (${a['votants']}) > Inscrits corriges (${a['inscrits_corriges']})');
-              if (a['anomalie_total_incorrect'] == true)
-                details.add('Total : ${a['votants']} != ${a['nuls']} nuls + ${a['exprimes']} exprimes');
-              if (a['anomalie_nuls_eleves'] == true)
-                details.add('Bulletins nuls eleves : ${a['nuls']} / ${a['votants']}');
-              if (a['anomalie_zero_exprimes'] == true)
-                details.add('Aucun exprime alors que ${a['votants']} votants');
-              if (a['anomalie_photo_manquante'] == true)
-                details.add('Photo du PV manquante');
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                shape: RoundedRectangleBorder(
-                    side: BorderSide(color: color.withOpacity(0.4)),
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      Icon(color == Colors.red ? Icons.error : Icons.warning,
-                          color: color, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(a['nom'] ?? '--',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                    ]),
-                    Text('${a['region']} - ${a['commune']} - ${a['centre']}',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                    const Divider(height: 12),
-                    ...details.map((d) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Row(children: [
-                        Icon(Icons.arrow_right, color: color, size: 16),
-                        const SizedBox(width: 4),
-                        Expanded(child: Text(d, style: TextStyle(fontSize: 12, color: color))),
-                      ]),
-                    )),
-                  ]),
-                ),
-              );
-            }
-          }
           EOF
 
           # -- main.dart -----------------------------------------
