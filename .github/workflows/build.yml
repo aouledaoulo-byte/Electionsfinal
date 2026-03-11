@@ -56,196 +56,489 @@ jobs:
 
           # ── models.dart ──────────────────────────────────────
           cat > lib/models/models.dart << 'EOF'
-          class Bureau {
-            final String id, code, nom, region, commune, centre;
-            final int inscrits, ordreMission, ordonnance;
-            final String? agentId;
-            Bureau({required this.id, required this.code, required this.nom,
-              required this.region, required this.commune, required this.centre,
-              required this.inscrits, required this.ordreMission, required this.ordonnance,
-              this.agentId});
-            int get inscritsCorriges => inscrits + ordreMission + ordonnance;
-            factory Bureau.fromJson(Map<String, dynamic> j) => Bureau(
-              id: j['id'], code: j['code'], nom: j['nom'],
-              region: j['region'], commune: j['commune'], centre: j['centre'],
-              inscrits: j['inscrits'] ?? 0, ordreMission: j['ordre_mission'] ?? 0,
-              ordonnance: j['ordonnance'] ?? 0, agentId: j['agent_id']);
-          }
-          class TurnoutSnapshot {
-            final String? id, bureauId, saisiPar, validesPar, noteRejet;
-            final int heure, votants;
-            final String statut;
-            final bool offline;
-            TurnoutSnapshot({this.id, required this.bureauId, required this.heure,
-              required this.votants, required this.statut, this.saisiPar,
-              this.validesPar, this.noteRejet, this.offline = false});
-            factory TurnoutSnapshot.fromJson(Map<String, dynamic> j) => TurnoutSnapshot(
-              id: j['id'], bureauId: j['bureau_id'], heure: j['heure'],
-              votants: j['votants'], statut: j['statut'] ?? 'soumis',
-              saisiPar: j['saisi_par'], noteRejet: j['note_rejet'],
-              offline: j['offline'] ?? false);
-            Map<String, dynamic> toJson() => {'bureau_id': bureauId, 'heure': heure,
-              'votants': votants, 'statut': statut, 'saisi_par': saisiPar};
-          }
-          class PvResult {
-            final String? id, bureauId, saisiPar, validesPar, noteRejet, photoUrl;
-            final int votants, nuls, voixA, voixB;
-            final String statut;
-            PvResult({this.id, required this.bureauId, required this.votants,
-              required this.nuls, required this.voixA, required this.voixB,
-              required this.statut, this.saisiPar, this.validesPar,
-              this.noteRejet, this.photoUrl});
-            int get exprimes => voixA + voixB;
-            double get pctA => exprimes > 0 ? voixA / exprimes * 100 : 0;
-            double get pctB => exprimes > 0 ? voixB / exprimes * 100 : 0;
-            double get pctNuls => votants > 0 ? nuls / votants * 100 : 0;
-            factory PvResult.fromJson(Map<String, dynamic> j) => PvResult(
-              id: j['id'], bureauId: j['bureau_id'], votants: j['votants'] ?? 0,
-              nuls: j['nuls'] ?? 0, voixA: j['voix_a'] ?? 0, voixB: j['voix_b'] ?? 0,
-              statut: j['statut'] ?? 'soumis', saisiPar: j['saisi_par'],
-              noteRejet: j['note_rejet'], photoUrl: j['photo_url']);
-            Map<String, dynamic> toJson() => {'bureau_id': bureauId, 'votants': votants,
-              'nuls': nuls, 'voix_a': voixA, 'voix_b': voixB, 'statut': statut,
-              'saisi_par': saisiPar, 'photo_url': photoUrl};
-          }
-          class Utilisateur {
-            final String id, codeUnique, nom, role;
-            final String? prenom, region, authId;
-            Utilisateur({required this.id, required this.codeUnique,
-              required this.nom, required this.role, this.prenom, this.region, this.authId});
-            factory Utilisateur.fromJson(Map<String, dynamic> j) => Utilisateur(
-              id: j['id'], codeUnique: j['code_unique'], nom: j['nom'],
-              role: j['role'], prenom: j['prenom'], region: j['region'], authId: j['auth_id']);
-          }
+// ── Bureau ──────────────────────────────────────────────────
+class Bureau {
+  final String id, code, nom, region, commune, centre;
+  final int inscrits, ordreMission, ordonnance;
+  final String? agentId;
+
+  Bureau({
+    required this.id, required this.code, required this.nom,
+    required this.region, required this.commune, required this.centre,
+    required this.inscrits, required this.ordreMission, required this.ordonnance,
+    this.agentId,
+  });
+
+  int get inscritsCorriges => inscrits + ordreMission + ordonnance;
+
+  factory Bureau.fromJson(Map<String, dynamic> j) => Bureau(
+    id: j['id'], code: j['code'], nom: j['nom'],
+    region: j['region'], commune: j['commune'], centre: j['centre'],
+    inscrits: j['inscrits'] ?? 0,
+    ordreMission: j['ordre_mission'] ?? 0,
+    ordonnance: j['ordonnance'] ?? 0,
+    agentId: j['agent_id'],
+  );
+}
+
+// ── TurnoutSnapshot ─────────────────────────────────────────
+class TurnoutSnapshot {
+  final String? id, bureauId, saisiPar, validesPar, noteRejet;
+  final int heure, votants;
+  final String statut;
+  final bool offline;
+  final DateTime? createdAt;
+
+  TurnoutSnapshot({
+    this.id, required this.bureauId, required this.heure,
+    required this.votants, required this.statut,
+    this.saisiPar, this.validesPar, this.noteRejet,
+    this.offline = false, this.createdAt,
+  });
+
+  factory TurnoutSnapshot.fromJson(Map<String, dynamic> j) => TurnoutSnapshot(
+    id: j['id'], bureauId: j['bureau_id'],
+    heure: j['heure'], votants: j['votants'],
+    statut: j['statut'] ?? 'soumis',
+    saisiPar: j['saisi_par'], validesPar: j['valide_par'],
+    noteRejet: j['note_rejet'], offline: j['offline'] ?? false,
+    createdAt: j['created_at'] != null ? DateTime.parse(j['created_at']) : null,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'bureau_id': bureauId, 'heure': heure, 'votants': votants,
+    'statut': statut, 'saisi_par': saisiPar, 'offline': offline,
+  };
+}
+
+// ── PvResult ─────────────────────────────────────────────────
+class PvResult {
+  final String? id, bureauId, saisiPar, validesPar, noteRejet, photoUrl;
+  final int votants, nuls, voixA, voixB;
+  final String statut;
+  final bool offline;
+  final DateTime? createdAt;
+
+  PvResult({
+    this.id, required this.bureauId, required this.votants,
+    required this.nuls, required this.voixA, required this.voixB,
+    required this.statut, this.saisiPar, this.validesPar,
+    this.noteRejet, this.photoUrl, this.offline = false, this.createdAt,
+  });
+
+  int get exprimes => voixA + voixB;
+  double get pctA => exprimes > 0 ? voixA / exprimes * 100 : 0;
+  double get pctB => exprimes > 0 ? voixB / exprimes * 100 : 0;
+  double get pctNuls => votants > 0 ? nuls / votants * 100 : 0;
+
+  factory PvResult.fromJson(Map<String, dynamic> j) => PvResult(
+    id: j['id'], bureauId: j['bureau_id'],
+    votants: j['votants'] ?? 0, nuls: j['nuls'] ?? 0,
+    voixA: j['voix_a'] ?? 0, voixB: j['voix_b'] ?? 0,
+    statut: j['statut'] ?? 'soumis',
+    saisiPar: j['saisi_par'], validesPar: j['valide_par'],
+    noteRejet: j['note_rejet'], photoUrl: j['photo_url'],
+    offline: j['offline'] ?? false,
+    createdAt: j['created_at'] != null ? DateTime.parse(j['created_at']) : null,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'bureau_id': bureauId, 'votants': votants, 'nuls': nuls,
+    'voix_a': voixA, 'voix_b': voixB, 'statut': statut,
+    'saisi_par': saisiPar, 'photo_url': photoUrl, 'offline': offline,
+  };
+}
+
+// ── Utilisateur ──────────────────────────────────────────────
+class Utilisateur {
+  final String id, codeUnique, nom, role;
+  final String? prenom, region, commune, authId;
+
+  Utilisateur({
+    required this.id, required this.codeUnique,
+    required this.nom, required this.role,
+    this.prenom, this.region, this.commune, this.authId,
+  });
+
+  factory Utilisateur.fromJson(Map<String, dynamic> j) => Utilisateur(
+    id: j['id'], codeUnique: j['code_unique'],
+    nom: j['nom'], role: j['role'],
+    prenom: j['prenom'], region: j['region'],
+    commune: j['commune'], authId: j['auth_id'],
+  );
+}
+
           EOF
 
           # ── services.dart ─────────────────────────────────────
           cat > lib/services/services.dart << 'EOF'
-          import 'package:supabase_flutter/supabase_flutter.dart';
-          import 'package:shared_preferences/shared_preferences.dart';
-          import '../models/models.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/models.dart';
 
-          final _sb = Supabase.instance.client;
+final _sb = Supabase.instance.client;
 
-          class AuthService {
-            Future<Utilisateur?> loginWithCode(String codeUnique) async {
-              try {
-                final res = await _sb.from('utilisateurs').select()
-                  .eq('code_unique', codeUnique).eq('actif', true).single();
-                final user = Utilisateur.fromJson(res);
-                if (_sb.auth.currentSession == null) await _sb.auth.signInAnonymously();
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('user_id', user.id);
-                await prefs.setString('user_role', user.role);
-                await prefs.setString('user_nom', user.nom);
-                if (user.region != null) await prefs.setString('user_region', user.region!);
-                return user;
-              } catch (e) { return null; }
-            }
-            Future<String?> getUserRole() async {
-              final p = await SharedPreferences.getInstance();
-              return p.getString('user_role');
-            }
-            Future<String?> getUserId() async {
-              final p = await SharedPreferences.getInstance();
-              return p.getString('user_id');
-            }
-            Future<String?> getUserNom() async {
-              final p = await SharedPreferences.getInstance();
-              return p.getString('user_nom');
-            }
-            Future<void> logout() async {
-              await _sb.auth.signOut();
-              final p = await SharedPreferences.getInstance();
-              await p.clear();
-            }
-          }
+// ============================================================
+//  AUTH SERVICE
+// ============================================================
+class AuthService {
+  Future<Utilisateur?> loginWithCode(String codeUnique) async {
+    try {
+      // Chercher l'utilisateur par code unique
+      final res = await _sb
+          .from('utilisateurs')
+          .select()
+          .eq('code_unique', codeUnique)
+          .eq('actif', true)
+          .single();
 
-          class DataService {
-            Future<List<Bureau>> getBureauxAgent(String agentId) async {
-              final res = await _sb.from('bureaux').select().eq('agent_id', agentId).eq('actif', true);
-              return (res as List).map((j) => Bureau.fromJson(j)).toList();
-            }
-            Future<List<Bureau>> getBureauxRegion(String region) async {
-              final res = await _sb.from('bureaux').select().eq('region', region).eq('actif', true);
-              return (res as List).map((j) => Bureau.fromJson(j)).toList();
-            }
-            Future<List<Bureau>> getAllBureaux() async {
-              final res = await _sb.from('bureaux').select().eq('actif', true).order('region');
-              return (res as List).map((j) => Bureau.fromJson(j)).toList();
-            }
-            Future<List<TurnoutSnapshot>> getSnapshotsBureau(String bureauId) async {
-              final res = await _sb.from('turnout_snapshots').select()
-                .eq('bureau_id', bureauId).order('heure');
-              return (res as List).map((j) => TurnoutSnapshot.fromJson(j)).toList();
-            }
-            Future<bool> submitSnapshot({required String bureauId, required int heure,
-              required int votants, required String saisiPar}) async {
-              try {
-                await _sb.from('turnout_snapshots').upsert({'bureau_id': bureauId,
-                  'heure': heure, 'votants': votants, 'saisi_par': saisiPar,
-                  'statut': 'soumis'}, onConflict: 'bureau_id,heure');
-                return true;
-              } catch (e) { return false; }
-            }
-            Future<PvResult?> getPvBureau(String bureauId) async {
-              try {
-                final res = await _sb.from('pv_results').select().eq('bureau_id', bureauId).single();
-                return PvResult.fromJson(res);
-              } catch (_) { return null; }
-            }
-            Future<List<PvResult>> getAllPv() async {
-              final res = await _sb.from('pv_results').select();
-              return (res as List).map((j) => PvResult.fromJson(j)).toList();
-            }
-            Future<bool> submitPv({required String bureauId, required int votants,
-              required int nuls, required int voixA, required int voixB,
-              required String saisiPar, String? photoUrl}) async {
-              try {
-                await _sb.from('pv_results').upsert({'bureau_id': bureauId,
-                  'votants': votants, 'nuls': nuls, 'voix_a': voixA, 'voix_b': voixB,
-                  'saisi_par': saisiPar, 'photo_url': photoUrl, 'statut': 'soumis'},
-                  onConflict: 'bureau_id');
-                return true;
-              } catch (e) { return false; }
-            }
-            Future<bool> validerPv(String pvId, String validesPar) async {
-              try {
-                await _sb.from('pv_results').update({'statut': 'valide', 'valide_par': validesPar}).eq('id', pvId);
-                return true;
-              } catch (e) { return false; }
-            }
-            Future<bool> rejeterPv(String pvId, String noteRejet, String validesPar) async {
-              try {
-                await _sb.from('pv_results').update({'statut': 'rejete',
-                  'note_rejet': noteRejet, 'valide_par': validesPar}).eq('id', pvId);
-                return true;
-              } catch (e) { return false; }
-            }
-            Future<Map<String, dynamic>?> getKpiNational() async {
-              try { return await _sb.from('kpi_pv_national').select().single(); }
-              catch (_) { return null; }
-            }
-            Future<List<Map<String, dynamic>>> getKpiByRegion() async {
-              final res = await _sb.from('kpi_pv_by_region').select().order('region');
-              return List<Map<String, dynamic>>.from(res);
-            }
-            Future<List<Map<String, dynamic>>> getLiveCoverage() async {
-              final res = await _sb.from('kpi_live_coverage_by_hour').select().order('heure');
-              return List<Map<String, dynamic>>.from(res);
-            }
-            Future<List<Map<String, dynamic>>> getAnomalies() async {
-              final res = await _sb.from('v_audit_pv_anomalies').select().neq('niveau_anomalie', 'OK');
-              return List<Map<String, dynamic>>.from(res);
-            }
-            Future<String?> uploadPhotoPv(String bureauId, List<int> bytes) async {
-              try {
-                final path = 'pv/$bureauId/${DateTime.now().millisecondsSinceEpoch}.jpg';
-                await _sb.storage.from('pv-photos').uploadBinary(path, Uint8List.fromList(bytes));
-                return _sb.storage.from('pv-photos').getPublicUrl(path);
-              } catch (_) { return null; }
-            }
-          }
+      final user = Utilisateur.fromJson(res);
+
+      // Connexion anonyme liée au code unique
+      if (_sb.auth.currentSession == null) {
+        await _sb.auth.signInAnonymously();
+      }
+
+      // Sauvegarder localement
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_id', user.id);
+      await prefs.setString('user_role', user.role);
+      await prefs.setString('user_nom', user.nom);
+      if (user.region != null) await prefs.setString('user_region', user.region!);
+      if (user.commune != null) await prefs.setString('user_commune', user.commune!);
+
+      return user;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<String?> getUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role');
+  }
+
+  Future<String?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id');
+  }
+
+  Future<String?> getUserCommune() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_commune');
+  }
+
+  Future<String?> getUserNom() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_nom');
+  }
+
+  Future<void> logout() async {
+    await _sb.auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
+}
+
+// ============================================================
+//  SUPABASE DATA SERVICE
+// ============================================================
+class DataService {
+  // ── Bureaux ─────────────────────────────────────────────
+  Future<List<Bureau>> getBureauxAgent(String agentId) async {
+    final res = await _sb.from('bureaux').select().eq('agent_id', agentId).eq('actif', true);
+    return (res as List).map((j) => Bureau.fromJson(j)).toList();
+  }
+
+  Future<List<Bureau>> getBureauxRegion(String region) async {
+    final res = await _sb.from('bureaux').select().eq('region', region).eq('actif', true);
+    return (res as List).map((j) => Bureau.fromJson(j)).toList();
+  }
+
+  Future<List<Bureau>> getAllBureaux() async {
+    final res = await _sb.from('bureaux').select().eq('actif', true).order('region');
+    return (res as List).map((j) => Bureau.fromJson(j)).toList();
+  }
+
+  // ── Turnout Snapshots ────────────────────────────────────
+  Future<List<TurnoutSnapshot>> getSnapshotsBureau(String bureauId) async {
+    final res = await _sb
+        .from('turnout_snapshots')
+        .select()
+        .eq('bureau_id', bureauId)
+        .order('heure');
+    return (res as List).map((j) => TurnoutSnapshot.fromJson(j)).toList();
+  }
+
+  Future<bool> submitSnapshot({
+    required String bureauId, required int heure,
+    required int votants, required String saisiPar,
+  }) async {
+    try {
+      await _sb.from('turnout_snapshots').upsert({
+        'bureau_id': bureauId, 'heure': heure, 'votants': votants,
+        'saisi_par': saisiPar, 'statut': 'soumis', 'offline': false,
+      }, onConflict: 'bureau_id,heure');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> validerSnapshot(String snapshotId, String validesPar) async {
+    try {
+      await _sb.from('turnout_snapshots').update({
+        'statut': 'valide', 'valide_par': validesPar,
+      }).eq('id', snapshotId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> rejeterSnapshot(String snapshotId, String noteRejet, String validesPar) async {
+    try {
+      await _sb.from('turnout_snapshots').update({
+        'statut': 'rejete', 'note_rejet': noteRejet, 'valide_par': validesPar,
+      }).eq('id', snapshotId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ── PV Results ───────────────────────────────────────────
+  Future<PvResult?> getPvBureau(String bureauId) async {
+    try {
+      final res = await _sb.from('pv_results').select().eq('bureau_id', bureauId).single();
+      return PvResult.fromJson(res);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<PvResult>> getPvRegion(String region) async {
+    final bureaux = await getBureauxRegion(region);
+    final ids = bureaux.map((b) => b.id).toList();
+    if (ids.isEmpty) return [];
+    final res = await _sb.from('pv_results').select().inFilter('bureau_id', ids);
+    return (res as List).map((j) => PvResult.fromJson(j)).toList();
+  }
+
+  Future<List<PvResult>> getAllPv() async {
+    final res = await _sb.from('pv_results').select();
+    return (res as List).map((j) => PvResult.fromJson(j)).toList();
+  }
+
+  Future<bool> submitPv({
+    required String bureauId, required int votants, required int nuls,
+    required int voixA, required int voixB,
+    required String saisiPar, String? photoUrl,
+  }) async {
+    try {
+      await _sb.from('pv_results').upsert({
+        'bureau_id': bureauId, 'votants': votants, 'nuls': nuls,
+        'voix_a': voixA, 'voix_b': voixB, 'saisi_par': saisiPar,
+        'photo_url': photoUrl, 'statut': 'soumis', 'offline': false,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'bureau_id');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> validerPv(String pvId, String validesPar) async {
+    try {
+      await _sb.from('pv_results').update({'statut': 'valide', 'valide_par': validesPar}).eq('id', pvId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> rejeterPv(String pvId, String noteRejet, String validesPar) async {
+    try {
+      await _sb.from('pv_results').update({'statut': 'rejete', 'note_rejet': noteRejet, 'valide_par': validesPar}).eq('id', pvId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ── Dashboards (vues Supabase) ───────────────────────────
+  Future<Map<String, dynamic>?> getKpiNational() async {
+    try {
+      final res = await _sb.from('kpi_pv_national').select().single();
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getKpiByRegion() async {
+    final res = await _sb.from('kpi_pv_by_region').select().order('region');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getLiveCoverage({String? commune}) async {
+    if (commune != null && commune.isNotEmpty) {
+      // Filtrage par commune via requête directe
+      final bureaux = await _sb.from('bureaux').select('id').eq('commune', commune);
+      final ids = (bureaux as List).map((b) => b['id'].toString()).toList();
+      if (ids.isEmpty) return [];
+      final snaps = await _sb.from('turnout_snapshots')
+          .select('heure, votants, bureau_id')
+          .inFilter('bureau_id', ids)
+          .order('heure');
+      // Agréger par heure
+      final Map<int, Map<String, dynamic>> byHeure = {};
+      final totalBureaux = ids.length;
+      for (final s in snaps as List) {
+        final h = s['heure'] as int;
+        if (!byHeure.containsKey(h)) {
+          byHeure[h] = {'heure': h, 'nb_snapshots': 0, 'bureaux_actifs': <String>{}, 'total_votants': 0, 'total_bureaux': totalBureaux};
+        }
+        byHeure[h]!['nb_snapshots'] = (byHeure[h]!['nb_snapshots'] as int) + 1;
+        (byHeure[h]!['bureaux_actifs'] as Set<String>).add(s['bureau_id'].toString());
+        byHeure[h]!['total_votants'] = (byHeure[h]!['total_votants'] as int) + (s['votants'] as int? ?? 0);
+      }
+      return byHeure.values.map((h) {
+        final actifs = (h['bureaux_actifs'] as Set<String>).length;
+        return {
+          'heure': h['heure'],
+          'nb_snapshots': h['nb_snapshots'],
+          'bureaux_actifs': actifs,
+          'bureaux_valides': actifs,
+          'total_bureaux': h['total_bureaux'],
+          'moy_votants': actifs > 0 ? h['total_votants'] / actifs : 0,
+          'taux_participation': 0,
+          'pct_couverture': totalBureaux > 0 ? (actifs / totalBureaux * 100) : 0,
+        };
+      }).toList()..sort((a, b) => (a['heure'] as int).compareTo(b['heure'] as int));
+    }
+    final res = await _sb.from('kpi_live_coverage_by_hour').select().order('heure');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getAnomalies() async {
+    final res = await _sb.from('v_audit_pv_anomalies').select().neq('niveau_anomalie', 'OK');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getComparaisonLivePv() async {
+    final res = await _sb.from('v_compare_live18_pv').select();
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  // ── Upload photo PV ──────────────────────────────────────
+  Future<String?> uploadPhotoPv(String bureauId, List<int> bytes) async {
+    try {
+      final path = 'pv/$bureauId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _sb.storage.from('pv-photos').uploadBinary(path, bytes);
+      final url = _sb.storage.from('pv-photos').getPublicUrl(path);
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+
+  // ── Agents status ────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getAgentsStatus({String? commune}) async {
+    var q = _sb.from('v_agents_status').select();
+    if (commune != null && commune.isNotEmpty) {
+      q = q.eq('commune', commune);
+    }
+    final res = await q.order('statut').order('code_unique');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  // ── Messages ─────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getMessagesSent(String userId) async {
+    final res = await _sb.from('messages')
+        .select('*, destinataire:destinataire_id(code_unique)')
+        .eq('expediteur_id', userId)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getMessagesReceived(String userId, String? commune) async {
+    final res = await _sb.from('messages')
+        .select()
+        .or('destinataire_id.eq.$userId${commune != null ? ",commune.eq.$commune" : ""}')
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<bool> envoyerMessage({
+    required String expediteurId,
+    required String destinataireId,
+    required String contenu,
+  }) async {
+    try {
+      await _sb.from('messages').insert({
+        'expediteur_id': expediteurId,
+        'destinataire_id': destinataireId,
+        'contenu': contenu,
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> envoyerBroadcast({
+    required String expediteurId,
+    String? commune,
+    required String contenu,
+  }) async {
+    try {
+      await _sb.from('messages').insert({
+        'expediteur_id': expediteurId,
+        'commune': commune,
+        'contenu': contenu,
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  Future<void> updateLastSeen(String userId) async {
+    try {
+      await _sb.from('utilisateurs')
+          .update({'last_seen': DateTime.now().toIso8601String()})
+          .eq('id', userId);
+    } catch (_) {}
+  }
+
+// ============================================================
+//  OFFLINE SERVICE
+// ============================================================
+class OfflineService {
+  static const _keySnapshots = 'offline_snapshots';
+  static const _keyPv = 'offline_pv';
+
+  Future<void> saveSnapshotOffline(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keySnapshots) ?? [];
+    list.add(data.toString());
+    await prefs.setStringList(_keySnapshots, list);
+  }
+
+  Future<void> savePvOffline(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keyPv) ?? [];
+    list.add(data.toString());
+    await prefs.setStringList(_keyPv, list);
+  }
+
+  Future<int> getPendingCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final s = prefs.getStringList(_keySnapshots) ?? [];
+    final p = prefs.getStringList(_keyPv) ?? [];
+    return s.length + p.length;
+  }
+}
+
           EOF
 
           # Add Uint8List import to services.dart
@@ -529,53 +822,87 @@ jobs:
 
           # ── superviseur_home.dart ─────────────────────────────
           cat > lib/screens/superviseur/superviseur_home.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import '../../services/services.dart';
-          import '../../utils/constants.dart';
-          import '../login_screen.dart';
-          import 'dashboard_national.dart';
-          import 'dashboard_live.dart';
+import 'package:flutter/material.dart';
+import '../../services/services.dart';
+import '../../utils/constants.dart';
+import '../login_screen.dart';
+import 'dashboard_national.dart';
+import 'dashboard_live.dart';
+import 'agents_screen.dart';
+import 'validation_screen.dart';
+import 'anomalies_screen.dart';
 
-          class SuperviseurHome extends StatefulWidget {
-            const SuperviseurHome({super.key});
-            @override State<SuperviseurHome> createState() => _SuperviseurHomeState();
-          }
-          class _SuperviseurHomeState extends State<SuperviseurHome> {
-            int _page = 0;
-            String _nom = '', _role = '';
-            @override void initState() { super.initState(); _init(); }
-            Future<void> _init() async {
-              final a = AuthService();
-              setState(() {});
-              _nom = await a.getUserNom() ?? '';
-              _role = await a.getUserRole() ?? '';
-              setState(() {});
-            }
-            Future<void> _logout() async {
-              await AuthService().logout();
-              if (!mounted) return;
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-            }
-            @override
-            Widget build(BuildContext context) {
-              final pages = const [DashboardNational(), DashboardLive(), ValidationScreen(), AnomaliesScreen()];
-              return Scaffold(
-                appBar: AppBar(
-                  title: Text(_role == AppRoles.superviseurNational ? 'Dashboard National' : 'Dashboard Régional'),
-                  backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
-                  actions: [Padding(padding: const EdgeInsets.only(right: 8),
-                    child: Center(child: Text(_nom, style: const TextStyle(fontSize: 13, color: Colors.white70)))),
-                    IconButton(icon: const Icon(Icons.logout), onPressed: _logout)]),
-                body: pages[_page],
-                bottomNavigationBar: NavigationBar(selectedIndex: _page,
-                  onDestinationSelected: (i) => setState(() => _page = i),
-                  destinations: const [
-                    NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Résultats'),
-                    NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
-                    NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
-                    NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies')]));
-            }
-          }
+class SuperviseurHome extends StatefulWidget {
+  const SuperviseurHome({super.key});
+  @override
+  State<SuperviseurHome> createState() => _SuperviseurHomeState();
+}
+
+class _SuperviseurHomeState extends State<SuperviseurHome> {
+  int _page = 0;
+  String _nom = '', _role = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final auth = AuthService();
+    final nom  = await auth.getUserNom();
+    final role = await auth.getUserRole();
+    setState(() {
+      _nom  = nom ?? '';
+      _role = role ?? '';
+    });
+  }
+
+  Future<void> _logout() async {
+    await AuthService().logout();
+    if (!mounted) return;
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+  }
+
+  final _pages = const [
+    DashboardNational(),
+    DashboardLive(),
+    AgentsScreen(),
+    ValidationScreen(),
+    AnomaliesScreen(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isNational = _role == AppRoles.superviseurNational;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isNational ? 'Dashboard National' : 'Dashboard Régional'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Center(child: Text(_nom,
+                style: const TextStyle(fontSize: 13, color: Colors.white70))),
+          ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+        ],
+      ),
+      body: _pages[_page],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _page,
+        onDestinationSelected: (i) => setState(() => _page = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Résultats'),
+          NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
+          NavigationDestination(icon: Icon(Icons.people), label: 'Agents'),
+          NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
+          NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies'),
+        ],
+      ),
+    );
+  }
+}
+
           EOF
 
           # Copy dashboard files from uploaded versions (they have correct content)
@@ -583,6 +910,313 @@ jobs:
           if [ -f dashboard_national.dart ]; then
             mv dashboard_national.dart lib/screens/superviseur/
           fi
+
+          # ── agents_screen.dart ────────────────────────────────
+          cat > lib/screens/superviseur/agents_screen.dart << 'EOF'
+import 'package:flutter/material.dart';
+import '../../services/services.dart';
+
+// ============================================================
+//  ÉCRAN : Liste des agents + statut en ligne + messagerie
+// ============================================================
+class AgentsScreen extends StatefulWidget {
+  const AgentsScreen({super.key});
+  @override
+  State<AgentsScreen> createState() => _AgentsScreenState();
+}
+
+class _AgentsScreenState extends State<AgentsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+  final _data = DataService();
+  final _auth = AuthService();
+  List<Map<String, dynamic>> _agents = [];
+  List<Map<String, dynamic>> _messages = [];
+  bool _loading = true;
+  String? _commune;
+  String? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    _init();
+  }
+
+  Future<void> _init() async {
+    _commune = await _auth.getUserCommune();
+    _userId  = await _auth.getUserId();
+    await _charger();
+  }
+
+  Future<void> _charger() async {
+    setState(() => _loading = true);
+    final agents   = await _data.getAgentsStatus(commune: _commune);
+    final messages = await _data.getMessagesSent(_userId ?? '');
+    setState(() {
+      _agents   = agents;
+      _messages = messages;
+      _loading  = false;
+    });
+  }
+
+  @override
+  void dispose() { _tabs.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(children: [
+              TabBar(
+                controller: _tabs,
+                labelColor: const Color(0xFF1B5E20),
+                indicatorColor: const Color(0xFF1B5E20),
+                tabs: [
+                  Tab(text: 'Agents (${_agents.length})'),
+                  Tab(text: 'Messages (${_messages.length})'),
+                ],
+              ),
+              Expanded(child: TabBarView(
+                controller: _tabs,
+                children: [_tabAgents(), _tabMessages()],
+              )),
+            ]),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _envoyerBroadcast,
+        backgroundColor: const Color(0xFF1B5E20),
+        icon: const Icon(Icons.campaign, color: Colors.white),
+        label: const Text('Diffuser', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  // ── Tab Agents ──────────────────────────────────────────
+  Widget _tabAgents() {
+    final enLigne    = _agents.where((a) => a['statut'] == 'en_ligne').length;
+    final recemment  = _agents.where((a) => a['statut'] == 'recemment').length;
+    final horsLigne  = _agents.where((a) => a['statut'] == 'hors_ligne' || a['statut'] == 'jamais_connecte').length;
+
+    return RefreshIndicator(
+      onRefresh: _charger,
+      child: Column(children: [
+        // Résumé statuts
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(children: [
+            _statutChip('En ligne', enLigne, Colors.green),
+            const SizedBox(width: 8),
+            _statutChip('Récent', recemment, Colors.orange),
+            const SizedBox(width: 8),
+            _statutChip('Hors ligne', horsLigne, Colors.red),
+          ]),
+        ),
+        Expanded(child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: _agents.length,
+          itemBuilder: (_, i) => _agentCard(_agents[i]),
+        )),
+      ]),
+    );
+  }
+
+  Widget _statutChip(String label, int count, Color color) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withOpacity(0.3))),
+      child: Column(children: [
+        Text(count.toString(),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: color)),
+        Text(label, style: TextStyle(fontSize: 10, color: color)),
+      ]),
+    ),
+  );
+
+  Widget _agentCard(Map<String, dynamic> a) {
+    final statut = a['statut'] as String;
+    final Color color;
+    final IconData icon;
+    String statutLabel;
+
+    switch (statut) {
+      case 'en_ligne':
+        color = Colors.green; icon = Icons.circle; statutLabel = 'En ligne';
+        break;
+      case 'recemment':
+        color = Colors.orange; icon = Icons.circle; statutLabel = 'Récent';
+        break;
+      default:
+        color = Colors.grey; icon = Icons.circle_outlined;
+        statutLabel = statut == 'jamais_connecte' ? 'Jamais connecté' : 'Hors ligne';
+    }
+
+    final nbReleves = (a['nb_releves'] as num?)?.toInt() ?? 0;
+    final nbPv      = (a['nb_pv'] as num?)?.toInt() ?? 0;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withOpacity(0.15),
+          child: Icon(icon, color: color, size: 14),
+        ),
+        title: Text(a['code_unique'] ?? '—',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${a['centre'] ?? ''} · Bureau ${a['bureau_code'] ?? ''}',
+              style: const TextStyle(fontSize: 11)),
+          Row(children: [
+            Icon(Icons.access_time, size: 11, color: Colors.grey),
+            const SizedBox(width: 3),
+            Text('$nbReleves relevés · $nbPv PV',
+                style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          ]),
+        ]),
+        trailing: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(statutLabel, style: TextStyle(fontSize: 10, color: color,
+              fontWeight: FontWeight.bold)),
+          IconButton(
+            icon: const Icon(Icons.message, size: 18),
+            color: const Color(0xFF1B5E20),
+            onPressed: () => _envoyerMessage(a),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  // ── Tab Messages ──────────────────────────────────────────
+  Widget _tabMessages() {
+    if (_messages.isEmpty) {
+      return const Center(child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.mark_chat_unread_outlined, size: 64, color: Colors.grey),
+          SizedBox(height: 12),
+          Text('Aucun message envoyé', style: TextStyle(color: Colors.grey)),
+        ],
+      ));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: _messages.length,
+      itemBuilder: (_, i) {
+        final m = _messages[i];
+        return Card(
+          child: ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: Color(0xFFE8F5E9),
+              child: Icon(Icons.send, color: Color(0xFF1B5E20), size: 18),
+            ),
+            title: Text(m['commune'] != null
+                ? '📢 Broadcast ${m['commune']}'
+                : m['destinataire'] ?? '—',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            subtitle: Text(m['contenu'] ?? '',
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12)),
+            trailing: Text(
+              _formatDate(m['created_at']),
+              style: const TextStyle(fontSize: 10, color: Colors.grey),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Actions ──────────────────────────────────────────────
+  Future<void> _envoyerMessage(Map<String, dynamic> agent) async {
+    String contenu = '';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Message à ${agent['code_unique']}'),
+        content: TextField(
+          decoration: const InputDecoration(
+              labelText: 'Votre message', border: OutlineInputBorder()),
+          maxLines: 3,
+          onChanged: (v) => contenu = v,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20)),
+            child: const Text('Envoyer'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && contenu.isNotEmpty) {
+      await _data.envoyerMessage(
+          expediteurId: _userId!,
+          destinataireId: agent['id'],
+          contenu: contenu);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Message envoyé ✓'),
+              backgroundColor: Colors.green));
+      _charger();
+    }
+  }
+
+  Future<void> _envoyerBroadcast() async {
+    String contenu = '';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('📢 Diffuser à tous les agents${_commune != null ? ' de $_commune' : ''}'),
+        content: TextField(
+          decoration: const InputDecoration(
+              labelText: 'Message pour tous les agents',
+              border: OutlineInputBorder()),
+          maxLines: 3,
+          onChanged: (v) => contenu = v,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20)),
+            child: const Text('Diffuser'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && contenu.isNotEmpty) {
+      await _data.envoyerBroadcast(
+          expediteurId: _userId!,
+          commune: _commune,
+          contenu: contenu);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Diffusé à ${_agents.length} agents ✓'),
+              backgroundColor: Colors.green));
+      _charger();
+    }
+  }
+
+  String _formatDate(dynamic d) {
+    if (d == null) return '';
+    try {
+      final dt = DateTime.parse(d.toString()).toLocal();
+      return '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+    } catch (_) { return ''; }
+  }
+}
+
+          EOF
           if [ -f dashboard_live.dart ]; then
             mv dashboard_live.dart lib/screens/superviseur/
           fi
@@ -659,178 +1293,487 @@ jobs:
 
           # Create dashboard_live.dart with all classes
           cat > lib/screens/superviseur/dashboard_live.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import '../../services/services.dart';
-          import '../../models/models.dart';
-          import '../../utils/constants.dart';
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import '../../services/services.dart';
+import '../../utils/constants.dart';
 
-          class DashboardLive extends StatefulWidget {
-            const DashboardLive({super.key});
-            @override State<DashboardLive> createState() => _DashboardLiveState();
-          }
-          class _DashboardLiveState extends State<DashboardLive> {
-            final _data = DataService();
-            List<Map<String, dynamic>> _coverage = [];
-            bool _loading = true;
-            @override void initState() { super.initState(); _charger(); }
-            Future<void> _charger() async {
-              setState(() => _loading = true);
-              final c = await _data.getLiveCoverage();
-              setState(() { _coverage = c; _loading = false; });
-            }
-            @override
-            Widget build(BuildContext context) {
-              if (_loading) return const Center(child: CircularProgressIndicator());
-              return RefreshIndicator(onRefresh: _charger, child: ListView(
-                padding: const EdgeInsets.all(14),
-                children: _coverage.map((c) {
-                  final h = (c['heure'] as num).toInt();
-                  final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
-                  final total = (c['total_bureaux'] as num?)?.toInt() ?? 0;
-                  final valides = (c['bureaux_valides'] as num?)?.toInt() ?? 0;
-                  final taux = (c['taux_participation'] as num?)?.toDouble() ?? 0;
-                  final color = pct >= 80 ? Colors.green : pct >= 50 ? Colors.orange : Colors.grey;
-                  return Card(margin: const EdgeInsets.only(bottom: 8), child: Padding(
-                    padding: const EdgeInsets.all(12), child: Row(children: [
-                      CircleAvatar(backgroundColor: color.withOpacity(0.15),
-                        child: Text('${h}h', style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11))),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(
-                          value: pct/100, minHeight: 8, backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation(color))),
-                        const SizedBox(height: 4),
-                        Text('$valides/$total bureaux · part. ${taux.toStringAsFixed(1)}%',
-                          style: const TextStyle(fontSize: 11, color: Colors.grey))])),
-                      const SizedBox(width: 8),
-                      Text('${pct.toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.bold, color: color))])));
-                }).toList()));
-            }
-          }
+// ============================================================
+//  DASHBOARD LIVE — Suivi participation horaire
+// ============================================================
+class DashboardLive extends StatefulWidget {
+  const DashboardLive({super.key});
+  @override
+  State<DashboardLive> createState() => _DashboardLiveState();
+}
 
-          class ValidationScreen extends StatefulWidget {
-            const ValidationScreen({super.key});
-            @override State<ValidationScreen> createState() => _ValidationScreenState();
-          }
-          class _ValidationScreenState extends State<ValidationScreen> {
-            final _data = DataService();
-            List<Map<String, dynamic>> _pvSoumis = [];
-            bool _loading = true;
-            String _superviseurId = '';
-            @override void initState() { super.initState(); _charger(); }
-            Future<void> _charger() async {
-              _superviseurId = await AuthService().getUserId() ?? '';
-              setState(() => _loading = true);
-              final pvAll = await _data.getAllPv();
-              final bAll = await _data.getAllBureaux();
-              final bureauMap = {for (var b in bAll) b.id: b};
-              final soumis = pvAll.where((p) => p.statut == PvStatut.soumis).toList();
-              setState(() {
-                _pvSoumis = soumis.map((p) => {'pv': p, 'bureau': bureauMap[p.bureauId]}).toList();
-                _loading = false;
-              });
-            }
-            @override
-            Widget build(BuildContext context) {
-              if (_loading) return const Center(child: CircularProgressIndicator());
-              if (_pvSoumis.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
-                children: [Icon(Icons.check_circle, size: 64, color: Colors.green), SizedBox(height: 12),
-                  Text('Aucun PV en attente', style: TextStyle(color: Colors.grey, fontSize: 16))]));
-              return ListView.builder(padding: const EdgeInsets.all(12), itemCount: _pvSoumis.length,
-                itemBuilder: (_, i) {
-                  final pv = _pvSoumis[i]['pv'] as PvResult;
-                  final b = _pvSoumis[i]['bureau'] as Bureau?;
-                  final coherent = pv.votants == pv.nuls + pv.voixA + pv.voixB;
-                  return Card(margin: const EdgeInsets.only(bottom: 10), child: Padding(
-                    padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(b?.nom ?? '—', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Text('${b?.region ?? ''} · ${b?.commune ?? ''}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      const Divider(),
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                        _stat('Votants', pv.votants), _stat('Nuls', pv.nuls),
-                        _stat('A', pv.voixA), _stat('B', pv.voixB)]),
-                      if (!coherent) Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-                        child: Row(children: [const Icon(Icons.warning, color: Colors.red, size: 16),
-                          const SizedBox(width: 6), Text('Incohérence: ${pv.votants} ≠ ${pv.nuls}+${pv.voixA}+${pv.voixB}',
-                            style: const TextStyle(color: Colors.red, fontSize: 12))])),
-                      const SizedBox(height: 12),
-                      Row(children: [
-                        Expanded(child: OutlinedButton.icon(
-                          onPressed: () => _rejeter(pv),
-                          icon: const Icon(Icons.cancel, color: Colors.red),
-                          label: const Text('Rejeter', style: TextStyle(color: Colors.red)),
-                          style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)))),
-                        const SizedBox(width: 8),
-                        Expanded(child: ElevatedButton.icon(
-                          onPressed: () => _valider(pv.id!),
-                          icon: const Icon(Icons.check_circle),
-                          label: const Text('Valider'),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white)))]),
-                    ])));
-                });
-            }
-            Widget _stat(String l, int v) => Column(children: [
-              Text(v.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey))]);
-            Future<void> _valider(String pvId) async {
-              await _data.validerPv(pvId, _superviseurId);
-              if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV validé ✓'), backgroundColor: Colors.green)); _charger(); }
-            }
-            Future<void> _rejeter(PvResult pv) async {
-              String note = '';
-              final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
-                title: const Text('Rejeter le PV'),
-                content: TextField(decoration: const InputDecoration(labelText: 'Motif du rejet', border: OutlineInputBorder()),
-                  onChanged: (v) => note = v),
-                actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
-                  ElevatedButton(onPressed: () => Navigator.pop(context, true),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Rejeter'))]));
-              if (ok == true && pv.id != null) {
-                await _data.rejeterPv(pv.id!, note, _superviseurId);
-                if (mounted) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV rejeté'), backgroundColor: Colors.red)); _charger(); }
-              }
-            }
-          }
+class _DashboardLiveState extends State<DashboardLive> {
+  final _data = DataService();
+  List<Map<String, dynamic>> _coverage = [];
+  bool _loading = true;
+  String? _commune;
 
-          class AnomaliesScreen extends StatefulWidget {
-            const AnomaliesScreen({super.key});
-            @override State<AnomaliesScreen> createState() => _AnomaliesScreenState();
-          }
-          class _AnomaliesScreenState extends State<AnomaliesScreen> {
-            final _data = DataService();
-            List<Map<String, dynamic>> _anomalies = [];
-            bool _loading = true;
-            @override void initState() { super.initState(); _charger(); }
-            Future<void> _charger() async {
-              setState(() => _loading = true);
-              final a = await _data.getAnomalies();
-              setState(() { _anomalies = a; _loading = false; });
-            }
-            @override
-            Widget build(BuildContext context) {
-              if (_loading) return const Center(child: CircularProgressIndicator());
-              if (_anomalies.isEmpty) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
-                children: [Icon(Icons.verified_user, size: 64, color: Colors.green), SizedBox(height: 12),
-                  Text('Aucune anomalie', style: TextStyle(color: Colors.grey, fontSize: 16))]));
-              return RefreshIndicator(onRefresh: _charger, child: ListView.builder(
-                padding: const EdgeInsets.all(12), itemCount: _anomalies.length,
-                itemBuilder: (_, i) {
-                  final a = _anomalies[i];
-                  final critique = a['niveau_anomalie'] == 'CRITIQUE';
-                  final color = critique ? Colors.red : Colors.orange;
-                  return Card(margin: const EdgeInsets.only(bottom: 8),
-                    shape: RoundedRectangleBorder(side: BorderSide(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(12)),
-                    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [Icon(critique ? Icons.error : Icons.warning, color: color, size: 20), const SizedBox(width: 8),
-                        Expanded(child: Text(a['nom'] ?? '—', style: const TextStyle(fontWeight: FontWeight.bold)))]),
-                      Text('${a['region']} · ${a['commune']}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                      const Divider(height: 12),
-                      Text(a['niveau_anomalie'] ?? '', style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-                    ])));
-                }));
-            }
-          }
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    _commune = await AuthService().getUserCommune();
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    setState(() => _loading = true);
+    final c = await _data.getLiveCoverage(commune: _commune);
+    setState(() { _coverage = c; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    return RefreshIndicator(
+      onRefresh: _charger,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(14),
+        child: Column(children: [
+          // Graphique couverture par heure
+          Card(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Couverture LIVE par heure',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 4),
+              const Text('% bureaux ayant transmis un relevé',
+                  style: TextStyle(fontSize: 11, color: Colors.grey)),
+              const SizedBox(height: 16),
+              if (_coverage.isNotEmpty) SizedBox(
+                height: 200,
+                child: BarChart(BarChartData(
+                  barGroups: _coverage.map((c) {
+                    final h = (c['heure'] as num).toInt();
+                    final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
+                    return BarChartGroupData(x: h, barRods: [
+                      BarChartRodData(
+                        toY: pct,
+                        color: pct >= 80 ? Colors.green
+                            : pct >= 50 ? Colors.orange : Colors.red,
+                        width: 18, borderRadius: BorderRadius.circular(4),
+                      ),
+                    ]);
+                  }).toList(),
+                  titlesData: FlTitlesData(
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) => Text('${v.toInt()}h',
+                          style: const TextStyle(fontSize: 9)),
+                    )),
+                    leftTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) => Text('${v.toInt()}%',
+                          style: const TextStyle(fontSize: 9)),
+                      reservedSize: 32,
+                    )),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  maxY: 100,
+                  gridData: FlGridData(
+                    getDrawingHorizontalLine: (_) => FlLine(color: Colors.grey.shade200),
+                  ),
+                  borderData: FlBorderData(show: false),
+                )),
+              ),
+            ]),
+          )),
+          const SizedBox(height: 8),
+
+          // Tableau détaillé
+          Card(child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Détail par heure',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              const SizedBox(height: 12),
+              ..._coverage.map((c) {
+                final h = (c['heure'] as num).toInt();
+                final pct = (c['pct_couverture'] as num?)?.toDouble() ?? 0;
+                final total = (c['total_bureaux'] as num?)?.toInt() ?? 0;
+                final valides = (c['bureaux_valides'] as num?)?.toInt() ?? 0;
+                final taux = (c['taux_participation'] as num?)?.toDouble() ?? 0;
+                final color = pct >= 80 ? Colors.green : pct >= 50 ? Colors.orange : Colors.grey;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    Container(
+                      width: 42, height: 42,
+                      decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          shape: BoxShape.circle),
+                      child: Center(child: Text('${h}h',
+                          style: TextStyle(fontWeight: FontWeight.bold,
+                              color: color, fontSize: 12))),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: pct / 100, minHeight: 8,
+                          backgroundColor: Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation(color),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text('$valides/$total bureaux · part. ${taux.toStringAsFixed(1)}%',
+                          style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                    ])),
+                    const SizedBox(width: 8),
+                    Text('${pct.toStringAsFixed(0)}%',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                  ]),
+                );
+              }),
+            ]),
+          )),
+        ]),
+      ),
+    );
+  }
+}
+
+// ============================================================
+//  VALIDATION SCREEN — Valider/Rejeter PV et relevés
+// ============================================================
+class ValidationScreen extends StatefulWidget {
+  const ValidationScreen({super.key});
+  @override
+  State<ValidationScreen> createState() => _ValidationScreenState();
+}
+
+class _ValidationScreenState extends State<ValidationScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+  final _data = DataService();
+  List<Map<String, dynamic>> _pvSoumis = [];
+  List<TurnoutSnapshot> _snapsSoumis = [];
+  List<Bureau> _bureaux = [];
+  bool _loading = true;
+  String _superviseurId = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    _superviseurId = await AuthService().getUserId() ?? '';
+    setState(() => _loading = true);
+
+    final pvAll = await _data.getAllPv();
+    final bAll  = await _data.getAllBureaux();
+
+    // Filtrer PV soumis
+    final pvSoumis = pvAll.where((p) => p.statut == PvStatut.soumis).toList();
+    final bureauMap = {for (var b in bAll) b.id: b};
+
+    setState(() {
+      _pvSoumis = pvSoumis.map((p) => {
+        'pv': p,
+        'bureau': bureauMap[p.bureauId],
+      }).toList();
+      _bureaux = bAll;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(children: [
+              TabBar(
+                controller: _tabs,
+                tabs: [
+                  Tab(text: 'PV (${_pvSoumis.length})'),
+                  const Tab(text: 'Relevés LIVE'),
+                ],
+                labelColor: const Color(0xFF1B5E20),
+                indicatorColor: const Color(0xFF1B5E20),
+              ),
+              Expanded(child: TabBarView(
+                controller: _tabs,
+                children: [_tabPv(), _tabSnapshots()],
+              )),
+            ]),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _charger,
+        backgroundColor: const Color(0xFF1B5E20),
+        child: const Icon(Icons.refresh, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _tabPv() {
+    if (_pvSoumis.isEmpty) {
+      return const Center(child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.check_circle, size: 64, color: Colors.green),
+          SizedBox(height: 12),
+          Text('Tous les PV sont traités', style: TextStyle(color: Colors.grey)),
+        ],
+      ));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: _pvSoumis.length,
+      itemBuilder: (_, i) {
+        final item = _pvSoumis[i];
+        final pv = item['pv'] as PvResult;
+        final b  = item['bureau'] as Bureau?;
+        return Card(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(b?.nom ?? '—',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text('${b?.region ?? ''} · ${b?.commune ?? ''} · ${b?.centre ?? ''}',
+                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              const Divider(height: 16),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                _pvStat('Votants', pv.votants),
+                _pvStat('Nuls', pv.nuls),
+                _pvStat('A', pv.voixA),
+                _pvStat('B', pv.voixB),
+              ]),
+              // Vérification cohérence
+              if (pv.votants != pv.nuls + pv.voixA + pv.voixB)
+                Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Row(children: [
+                    const Icon(Icons.warning, color: Colors.red, size: 16),
+                    const SizedBox(width: 6),
+                    Text('INCOHÉRENCE : ${pv.votants} ≠ ${pv.nuls}+${pv.voixA}+${pv.voixB}',
+                        style: const TextStyle(color: Colors.red, fontSize: 12)),
+                  ]),
+                ),
+              if (pv.photoUrl != null) Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(children: [
+                  const Icon(Icons.image, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  const Text('Photo PV disponible',
+                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                ]),
+              ),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(
+                  onPressed: () => _rejeterPv(pv),
+                  icon: const Icon(Icons.cancel, color: Colors.red),
+                  label: const Text('Rejeter', style: TextStyle(color: Colors.red)),
+                  style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: () => _validerPv(pv.id!),
+                  icon: const Icon(Icons.check_circle),
+                  label: const Text('Valider'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                )),
+              ]),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _pvStat(String label, int value) => Column(children: [
+    Text(value.toString(),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+    Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+  ]);
+
+  Widget _tabSnapshots() {
+    return const Center(
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(Icons.access_time, size: 48, color: Colors.grey),
+        SizedBox(height: 12),
+        Text('Validation des relevés LIVE', style: TextStyle(color: Colors.grey)),
+        SizedBox(height: 4),
+        Text('Sélectionnez un bureau pour valider',
+            style: TextStyle(color: Colors.grey, fontSize: 12)),
+      ]),
+    );
+  }
+
+  Future<void> _validerPv(String pvId) async {
+    final ok = await _data.validerPv(pvId, _superviseurId);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PV validé ✓'), backgroundColor: Colors.green));
+      _charger();
+    }
+  }
+
+  Future<void> _rejeterPv(PvResult pv) async {
+    String note = '';
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Rejeter le PV'),
+        content: TextField(
+          decoration: const InputDecoration(
+              labelText: 'Motif du rejet', border: OutlineInputBorder()),
+          onChanged: (v) => note = v,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Annuler')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Rejeter'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && pv.id != null) {
+      final ok = await _data.rejeterPv(pv.id!, note, _superviseurId);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('PV rejeté'), backgroundColor: Colors.red));
+        _charger();
+      }
+    }
+  }
+}
+
+// ============================================================
+//  ANOMALIES SCREEN
+// ============================================================
+class AnomaliesScreen extends StatefulWidget {
+  const AnomaliesScreen({super.key});
+  @override
+  State<AnomaliesScreen> createState() => _AnomaliesScreenState();
+}
+
+class _AnomaliesScreenState extends State<AnomaliesScreen> {
+  final _data = DataService();
+  List<Map<String, dynamic>> _anomalies = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _charger();
+  }
+
+  Future<void> _charger() async {
+    setState(() => _loading = true);
+    final a = await _data.getAnomalies();
+    setState(() { _anomalies = a; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_anomalies.isEmpty) {
+      return const Center(child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.verified_user, size: 64, color: Colors.green),
+          SizedBox(height: 12),
+          Text('Aucune anomalie détectée', style: TextStyle(color: Colors.grey, fontSize: 16)),
+        ],
+      ));
+    }
+
+    final critiques = _anomalies.where((a) => a['niveau_anomalie'] == 'CRITIQUE').toList();
+    final warnings  = _anomalies.where((a) => a['niveau_anomalie'] == 'WARNING').toList();
+
+    return RefreshIndicator(
+      onRefresh: _charger,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          if (critiques.isNotEmpty) ...[
+            _headerSection('🔴 CRITIQUE (${critiques.length})', Colors.red),
+            ...critiques.map((a) => _anomalieCard(a, Colors.red)),
+          ],
+          if (warnings.isNotEmpty) ...[
+            _headerSection('⚠️ WARNING (${warnings.length})', Colors.orange),
+            ...warnings.map((a) => _anomalieCard(a, Colors.orange)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _headerSection(String title, Color color) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 15)),
+  );
+
+  Widget _anomalieCard(Map<String, dynamic> a, Color color) {
+    final List<String> details = [];
+    if (a['anomalie_votants_sup_inscrits'] == true)
+      details.add('Votants (${a['votants']}) > Inscrits corrigés (${a['inscrits_corriges']})');
+    if (a['anomalie_total_incorrect'] == true)
+      details.add('Total : ${a['votants']} ≠ ${a['nuls']} nuls + ${a['exprimes']} exprimés');
+    if (a['anomalie_nuls_eleves'] == true)
+      details.add('Bulletins nuls élevés : ${a['nuls']} / ${a['votants']}');
+    if (a['anomalie_zero_exprimes'] == true)
+      details.add('Aucun exprimé alors que ${a['votants']} votants');
+    if (a['anomalie_photo_manquante'] == true)
+      details.add('Photo du PV manquante');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      shape: RoundedRectangleBorder(
+          side: BorderSide(color: color.withOpacity(0.4)),
+          borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Icon(color == Colors.red ? Icons.error : Icons.warning,
+                color: color, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(a['nom'] ?? '—',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+          ]),
+          Text('${a['region']} · ${a['commune']} · ${a['centre']}',
+              style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          const Divider(height: 12),
+          ...details.map((d) => Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(children: [
+              Icon(Icons.arrow_right, color: color, size: 16),
+              const SizedBox(width: 4),
+              Expanded(child: Text(d, style: TextStyle(fontSize: 12, color: color))),
+            ]),
+          )),
+        ]),
+      ),
+    );
+  }
+}
+
           EOF
 
           # ── main.dart ─────────────────────────────────────────
