@@ -367,6 +367,13 @@ jobs:
             }
 
             // -- Dashboards (vues Supabase) ---------------------------
+            Future<List<PvResult>> getPvResults() async {
+              try {
+                final res = await _sb.from('pv_results').select();
+                return (res as List).map((j) => PvResult.fromJson(j)).toList();
+              } catch (_) { return []; }
+            }
+
             Future<Map<String, dynamic>?> getKpiNational() async {
               try {
                 final res = await _sb.from('kpi_pv_national').select().single();
@@ -442,8 +449,6 @@ jobs:
                 return null;
               }
             }
-          }
-
 
             // -- Agents status ----------------------------------------
             Future<List<Map<String, dynamic>>> getAgentsStatus({String? commune}) async {
@@ -510,68 +515,9 @@ jobs:
               } catch (_) {}
             }
 
-          // ============================================================
-          //  OFFLINE SERVICE
-          // ============================================================
 
-              // Agents status
-              Future<List<Map<String,dynamic>>> getAgentsStatus({String? commune}) async {
-                try {
-                  var q = _sb.from('v_agents_status').select();
-                  if (commune != null) q = q.eq('commune', commune);
-                  final res = await q.order('statut').order('code_unique');
-                  return List<Map<String,dynamic>>.from(res as List);
-                } catch (_) { return []; }
-              }
 
-              // Messages envoyes par un user
-              Future<List<Map<String,dynamic>>> getMessagesSent(String userId) async {
-                try {
-                  final res = await _sb.from('messages')
-                      .select()
-                      .eq('expediteur_id', userId)
-                      .order('created_at', ascending: false);
-                  return List<Map<String,dynamic>>.from(res as List);
-                } catch (_) { return []; }
-              }
-
-              // Messages recus
-              Future<List<Map<String,dynamic>>> getMessagesRecus({String? userId, String? commune}) async {
-                try {
-                  final res = await _sb.from('messages')
-                      .select()
-                      .or('destinataire_id.eq.${userId ?? ""},commune.eq.${commune ?? ""}')
-                      .order('created_at', ascending: false);
-                  return List<Map<String,dynamic>>.from(res as List);
-                } catch (_) { return []; }
-              }
-
-              // Envoyer message a un agent
-              Future<void> envoyerMessage({required String expediteurId, required String destinataireId, required String contenu}) async {
-                await _sb.from('messages').insert({
-                  'expediteur_id': expediteurId,
-                  'destinataire_id': destinataireId,
-                  'contenu': contenu,
-                });
-              }
-
-              // Broadcast a une commune
-              Future<void> envoyerBroadcast({required String expediteurId, required String commune, required String contenu}) async {
-                await _sb.from('messages').insert({
-                  'expediteur_id': expediteurId,
-                  'commune': commune,
-                  'contenu': contenu,
-                });
-              }
-
-              // Update last seen
-              Future<void> updateLastSeen(String userId) async {
-                try {
-                  await _sb.from('utilisateurs')
-                      .update({'last_seen': DateTime.now().toIso8601String()})
-                      .eq('id', userId);
-                } catch (_) {}
-              }
+          }
 
           class OfflineService {
             static const _keySnapshots = 'offline_snapshots';
@@ -1287,118 +1233,10 @@ jobs:
             fi
           done
 
-          # -- validation_screen.dart ---------------------------
-          cat > lib/screens/superviseur/validation_screen.dart << 'DARTEOF'
-          import 'package:flutter/material.dart';
-          import '../../services/services.dart';
-          import '../../models/models.dart';
-
-          class ValidationScreen extends StatefulWidget {
-            final String? commune;
-            const ValidationScreen({super.key, this.commune});
-            @override State<ValidationScreen> createState() => _ValidationScreenState();
-          }
-          class _ValidationScreenState extends State<ValidationScreen> {
-            final _data = DataService();
-            List<Map<String,dynamic>> _items = [];
-            bool _loading = true;
-
-            @override void initState() { super.initState(); _charger(); }
-
-            Future<void> _charger() async {
-              setState(() => _loading = true);
-              try {
-                final res = await _data.getPvResults();
-                setState(() { _items = res.where((r) => r['statut'] == 'soumis').toList(); });
-              } finally { setState(() => _loading = false); }
-            }
-
-            @override Widget build(BuildContext context) {
-              if (_loading) return const Center(child: CircularProgressIndicator());
-              if (_items.isEmpty) return const Center(child: Text('Aucun PV en attente de validation'));
-              return RefreshIndicator(
-                onRefresh: _charger,
-                child: ListView.builder(
-                  itemCount: _items.length,
-                  itemBuilder: (ctx, i) {
-                    final pv = _items[i];
-                    return Card(
-                      margin: const EdgeInsets.all(8),
-                      child: ListTile(
-                        title: Text('Bureau: ${pv['bureau_id'] ?? ""}'),
-                        subtitle: Text('Votants: ${pv['votants']} | Voix A: ${pv['voix_a']} | Voix B: ${pv['voix_b']}'),
-                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                          IconButton(icon: const Icon(Icons.check_circle, color: Colors.green),
-                            onPressed: () async {
-                              final uid = await _data.getUserId() ?? '';
-                              await _data.validerPv(pv['id'] as String, uid);
-                              _charger();
-                            }),
-                          IconButton(icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: () async {
-                              final uid = await _data.getUserId() ?? '';
-                              await _data.rejeterPv(pv['id'] as String, uid, 'Rejete');
-                              _charger();
-                            }),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-              );
-            }
-          }
-          DARTEOF
-
-          # -- anomalies_screen.dart ----------------------------
-          cat > lib/screens/superviseur/anomalies_screen.dart << 'DARTEOF'
-          import 'package:flutter/material.dart';
-          import '../../services/services.dart';
-
-          class AnomaliesScreen extends StatefulWidget {
-            final String? commune;
-            const AnomaliesScreen({super.key, this.commune});
-            @override State<AnomaliesScreen> createState() => _AnomaliesScreenState();
-          }
-          class _AnomaliesScreenState extends State<AnomaliesScreen> {
-            final _data = DataService();
-            List<Map<String,dynamic>> _items = [];
-            bool _loading = true;
-
-            @override void initState() { super.initState(); _charger(); }
-
-            Future<void> _charger() async {
-              setState(() => _loading = true);
-              try {
-                final res = await _data.getAnomalies();
-                setState(() => _items = res);
-              } finally { setState(() => _loading = false); }
-            }
-
-            @override Widget build(BuildContext context) {
-              if (_loading) return const Center(child: CircularProgressIndicator());
-              if (_items.isEmpty) return const Center(child: Text('Aucune anomalie detectee'));
-              return RefreshIndicator(
-                onRefresh: _charger,
-                child: ListView.builder(
-                  itemCount: _items.length,
-                  itemBuilder: (ctx, i) {
-                    final a = _items[i];
-                    return Card(
-                      margin: const EdgeInsets.all(8),
-                      color: Colors.orange[50],
-                      child: ListTile(
-                        leading: const Icon(Icons.warning, color: Colors.orange),
-                        title: Text('Bureau: ${a['bureau_code'] ?? a['bureau_id'] ?? ""}'),
-                        subtitle: Text('${a['niveau_anomalie'] ?? ""}: ${a['description'] ?? "Anomalie detectee"}'),
-                      ),
-                    );
-                  },
-                ),
-              );
-            }
-          }
-          DARTEOF
+          # -- validation_screen.dart et anomalies_screen.dart via base64
+          echo "aW1wb3J0ICJwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCI7CmltcG9ydCAiLi4vLi4vc2VydmljZXMvc2VydmljZXMuZGFydCI7CmltcG9ydCAiLi4vLi4vbW9kZWxzL21vZGVscy5kYXJ0IjsKY2xhc3MgVmFsaWRhdGlvblNjcmVlbiBleHRlbmRzIFN0YXRlZnVsV2lkZ2V0IHsKICBmaW5hbCBTdHJpbmc/IGNvbW11bmU7CiAgY29uc3QgVmFsaWRhdGlvblNjcmVlbih7c3VwZXIua2V5LCB0aGlzLmNvbW11bmV9KTsKICBAb3ZlcnJpZGUgU3RhdGU8VmFsaWRhdGlvblNjcmVlbj4gY3JlYXRlU3RhdGUoKSA9PiBfVmFsaWRhdGlvblNjcmVlblN0YXRlKCk7Cn0KY2xhc3MgX1ZhbGlkYXRpb25TY3JlZW5TdGF0ZSBleHRlbmRzIFN0YXRlPFZhbGlkYXRpb25TY3JlZW4+IHsKICBmaW5hbCBfZGF0YSA9IERhdGFTZXJ2aWNlKCk7CiAgTGlzdDxQdlJlc3VsdD4gX2l0ZW1zID0gW107CiAgYm9vbCBfbG9hZGluZyA9IHRydWU7CiAgQG92ZXJyaWRlIHZvaWQgaW5pdFN0YXRlKCkgeyBzdXBlci5pbml0U3RhdGUoKTsgX2NoYXJnZXIoKTsgfQogIEZ1dHVyZTx2b2lkPiBfY2hhcmdlcigpIGFzeW5jIHsKICAgIHNldFN0YXRlKCgpID0+IF9sb2FkaW5nID0gdHJ1ZSk7CiAgICB0cnkgewogICAgICBmaW5hbCByZXMgPSBhd2FpdCBfZGF0YS5nZXRQdlJlc3VsdHMoKTsKICAgICAgc2V0U3RhdGUoKCkgPT4gX2l0ZW1zID0gcmVzLndoZXJlKChyKSA9PiByLnN0YXR1dCA9PSAic291bWlzIikudG9MaXN0KCkpOwogICAgfSBmaW5hbGx5IHsgc2V0U3RhdGUoKCkgPT4gX2xvYWRpbmcgPSBmYWxzZSk7IH0KICB9CiAgQG92ZXJyaWRlIFdpZGdldCBidWlsZChCdWlsZENvbnRleHQgY29udGV4dCkgewogICAgaWYgKF9sb2FkaW5nKSByZXR1cm4gY29uc3QgQ2VudGVyKGNoaWxkOiBDaXJjdWxhclByb2dyZXNzSW5kaWNhdG9yKCkpOwogICAgaWYgKF9pdGVtcy5pc0VtcHR5KSByZXR1cm4gY29uc3QgQ2VudGVyKGNoaWxkOiBUZXh0KCJBdWN1biBQViBlbiBhdHRlbnRlIikpOwogICAgcmV0dXJuIFJlZnJlc2hJbmRpY2F0b3Iob25SZWZyZXNoOiBfY2hhcmdlciwKICAgICAgY2hpbGQ6IExpc3RWaWV3LmJ1aWxkZXIoaXRlbUNvdW50OiBfaXRlbXMubGVuZ3RoLCBpdGVtQnVpbGRlcjogKGN0eCwgaSkgewogICAgICAgIGZpbmFsIHB2ID0gX2l0ZW1zW2ldOwogICAgICAgIHJldHVybiBDYXJkKG1hcmdpbjogY29uc3QgRWRnZUluc2V0cy5hbGwoOCksIGNoaWxkOiBMaXN0VGlsZSgKICAgICAgICAgIHRpdGxlOiBUZXh0KCJCdXJlYXU6ICIgKyAocHYuYnVyZWF1SWQgPz8gIiIpKSwKICAgICAgICAgIHN1YnRpdGxlOiBUZXh0KCJWb3RhbnRzOiAiICsgcHYudm90YW50cy50b1N0cmluZygpKSwKICAgICAgICAgIHRyYWlsaW5nOiBSb3cobWFpbkF4aXNTaXplOiBNYWluQXhpc1NpemUubWluLCBjaGlsZHJlbjogWwogICAgICAgICAgICBJY29uQnV0dG9uKGljb246IGNvbnN0IEljb24oSWNvbnMuY2hlY2tfY2lyY2xlLCBjb2xvcjogQ29sb3JzLmdyZWVuKSwKICAgICAgICAgICAgICBvblByZXNzZWQ6ICgpIGFzeW5jIHsgZmluYWwgdWlkID0gYXdhaXQgX2RhdGEuZ2V0VXNlcklkKCkgPz8gIiI7IGF3YWl0IF9kYXRhLnZhbGlkZXJQdihwdi5pZCEsIHVpZCk7IF9jaGFyZ2VyKCk7IH0pLAogICAgICAgICAgICBJY29uQnV0dG9uKGljb246IGNvbnN0IEljb24oSWNvbnMuY2FuY2VsLCBjb2xvcjogQ29sb3JzLnJlZCksCiAgICAgICAgICAgICAgb25QcmVzc2VkOiAoKSBhc3luYyB7IGZpbmFsIHVpZCA9IGF3YWl0IF9kYXRhLmdldFVzZXJJZCgpID8/ICIiOyBhd2FpdCBfZGF0YS5yZWpldGVyUHYocHYuaWQhLCB1aWQsICJSZWpldGUiKTsgX2NoYXJnZXIoKTsgfSksCiAgICAgICAgICBdKSwKICAgICAgICApKTsKICAgICAgfSkpOwogIH0KfQ==" | base64 -d > lib/screens/superviseur/validation_screen.dart
+          echo "aW1wb3J0ICJwYWNrYWdlOmZsdXR0ZXIvbWF0ZXJpYWwuZGFydCI7CmltcG9ydCAiLi4vLi4vc2VydmljZXMvc2VydmljZXMuZGFydCI7CmNsYXNzIEFub21hbGllc1NjcmVlbiBleHRlbmRzIFN0YXRlZnVsV2lkZ2V0IHsKICBmaW5hbCBTdHJpbmc/IGNvbW11bmU7CiAgY29uc3QgQW5vbWFsaWVzU2NyZWVuKHtzdXBlci5rZXksIHRoaXMuY29tbXVuZX0pOwogIEBvdmVycmlkZSBTdGF0ZTxBbm9tYWxpZXNTY3JlZW4+IGNyZWF0ZVN0YXRlKCkgPT4gX0Fub21hbGllc1NjcmVlblN0YXRlKCk7Cn0KY2xhc3MgX0Fub21hbGllc1NjcmVlblN0YXRlIGV4dGVuZHMgU3RhdGU8QW5vbWFsaWVzU2NyZWVuPiB7CiAgZmluYWwgX2RhdGEgPSBEYXRhU2VydmljZSgpOwogIExpc3Q8TWFwPFN0cmluZyxkeW5hbWljPj4gX2l0ZW1zID0gW107CiAgYm9vbCBfbG9hZGluZyA9IHRydWU7CiAgQG92ZXJyaWRlIHZvaWQgaW5pdFN0YXRlKCkgeyBzdXBlci5pbml0U3RhdGUoKTsgX2NoYXJnZXIoKTsgfQogIEZ1dHVyZTx2b2lkPiBfY2hhcmdlcigpIGFzeW5jIHsKICAgIHNldFN0YXRlKCgpID0+IF9sb2FkaW5nID0gdHJ1ZSk7CiAgICB0cnkgeyBmaW5hbCByZXMgPSBhd2FpdCBfZGF0YS5nZXRBbm9tYWxpZXMoKTsgc2V0U3RhdGUoKCkgPT4gX2l0ZW1zID0gcmVzKTsgfQogICAgZmluYWxseSB7IHNldFN0YXRlKCgpID0+IF9sb2FkaW5nID0gZmFsc2UpOyB9CiAgfQogIEBvdmVycmlkZSBXaWRnZXQgYnVpbGQoQnVpbGRDb250ZXh0IGNvbnRleHQpIHsKICAgIGlmIChfbG9hZGluZykgcmV0dXJuIGNvbnN0IENlbnRlcihjaGlsZDogQ2lyY3VsYXJQcm9ncmVzc0luZGljYXRvcigpKTsKICAgIGlmIChfaXRlbXMuaXNFbXB0eSkgcmV0dXJuIGNvbnN0IENlbnRlcihjaGlsZDogVGV4dCgiQXVjdW5lIGFub21hbGllIikpOwogICAgcmV0dXJuIFJlZnJlc2hJbmRpY2F0b3Iob25SZWZyZXNoOiBfY2hhcmdlciwKICAgICAgY2hpbGQ6IExpc3RWaWV3LmJ1aWxkZXIoaXRlbUNvdW50OiBfaXRlbXMubGVuZ3RoLCBpdGVtQnVpbGRlcjogKGN0eCwgaSkgewogICAgICAgIGZpbmFsIGEgPSBfaXRlbXNbaV07CiAgICAgICAgcmV0dXJuIENhcmQobWFyZ2luOiBjb25zdCBFZGdlSW5zZXRzLmFsbCg4KSwgY29sb3I6IENvbG9ycy5vcmFuZ2VbNTBdLAogICAgICAgICAgY2hpbGQ6IExpc3RUaWxlKGxlYWRpbmc6IGNvbnN0IEljb24oSWNvbnMud2FybmluZywgY29sb3I6IENvbG9ycy5vcmFuZ2UpLAogICAgICAgICAgICB0aXRsZTogVGV4dCgiQnVyZWF1OiAiICsgKGFbImJ1cmVhdV9jb2RlIl0/LnRvU3RyaW5nKCkgPz8gIiIpKSwKICAgICAgICAgICAgc3VidGl0bGU6IFRleHQoYVsibml2ZWF1X2Fub21hbGllIl0/LnRvU3RyaW5nKCkgPz8gIkFub21hbGllIiksCiAgICAgICAgICApKTsKICAgICAgfSkpOwogIH0KfQ==" | base64 -d > lib/screens/superviseur/anomalies_screen.dart
+          echo 'Fichiers dart crees via base64'
 
           # Fix imports in dashboard files
           find lib/screens/superviseur -name "*.dart" | xargs sed -i \
