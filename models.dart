@@ -1,110 +1,300 @@
-// ── Bureau ──────────────────────────────────────────────────
-class Bureau {
-  final String id, code, nom, region, commune, centre;
-  final int inscrits, ordreMission, ordonnance;
-  final String? agentId;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/models.dart';
 
-  Bureau({
-    required this.id, required this.code, required this.nom,
-    required this.region, required this.commune, required this.centre,
-    required this.inscrits, required this.ordreMission, required this.ordonnance,
-    this.agentId,
-  });
+final _sb = Supabase.instance.client;
 
-  int get inscritsCorriges => inscrits + ordreMission + ordonnance;
+// ============================================================
+//  AUTH SERVICE
+// ============================================================
+class AuthService {
+  Future<Utilisateur?> loginWithCode(String codeUnique) async {
+    try {
+      // Chercher l'utilisateur par code unique
+      final res = await _sb
+          .from('utilisateurs')
+          .select()
+          .eq('code_unique', codeUnique)
+          .eq('actif', true)
+          .single();
 
-  factory Bureau.fromJson(Map<String, dynamic> j) => Bureau(
-    id: j['id'], code: j['code'], nom: j['nom'],
-    region: j['region'], commune: j['commune'], centre: j['centre'],
-    inscrits: j['inscrits'] ?? 0,
-    ordreMission: j['ordre_mission'] ?? 0,
-    ordonnance: j['ordonnance'] ?? 0,
-    agentId: j['agent_id'],
-  );
+      final user = Utilisateur.fromJson(res);
+
+      // Connexion anonyme liée au code unique
+      if (_sb.auth.currentSession == null) {
+        await _sb.auth.signInAnonymously();
+      }
+
+      // Sauvegarder localement
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_id', user.id);
+      await prefs.setString('user_role', user.role);
+      await prefs.setString('user_nom', user.nom);
+      if (user.region != null) await prefs.setString('user_region', user.region!);
+      if (user.commune != null) await prefs.setString('user_commune', user.commune!);
+
+      return user;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<String?> getUserRole() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_role');
+  }
+
+  Future<String?> getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_id');
+  }
+
+  Future<String?> getUserCommune() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_commune');
+  }
+
+  Future<String?> getUserNom() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_nom');
+  }
+
+  Future<void> logout() async {
+    await _sb.auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+  }
 }
 
-// ── TurnoutSnapshot ─────────────────────────────────────────
-class TurnoutSnapshot {
-  final String? id, bureauId, saisiPar, validesPar, noteRejet;
-  final int heure, votants;
-  final String statut;
-  final bool offline;
-  final DateTime? createdAt;
+// ============================================================
+//  SUPABASE DATA SERVICE
+// ============================================================
+class DataService {
+  // ── Bureaux ─────────────────────────────────────────────
+  Future<List<Bureau>> getBureauxAgent(String agentId) async {
+    final res = await _sb.from('bureaux').select().eq('agent_id', agentId).eq('actif', true);
+    return (res as List).map((j) => Bureau.fromJson(j)).toList();
+  }
 
-  TurnoutSnapshot({
-    this.id, required this.bureauId, required this.heure,
-    required this.votants, required this.statut,
-    this.saisiPar, this.validesPar, this.noteRejet,
-    this.offline = false, this.createdAt,
-  });
+  Future<List<Bureau>> getBureauxRegion(String region) async {
+    final res = await _sb.from('bureaux').select().eq('region', region).eq('actif', true);
+    return (res as List).map((j) => Bureau.fromJson(j)).toList();
+  }
 
-  factory TurnoutSnapshot.fromJson(Map<String, dynamic> j) => TurnoutSnapshot(
-    id: j['id'], bureauId: j['bureau_id'],
-    heure: j['heure'], votants: j['votants'],
-    statut: j['statut'] ?? 'soumis',
-    saisiPar: j['saisi_par'], validesPar: j['valide_par'],
-    noteRejet: j['note_rejet'], offline: j['offline'] ?? false,
-    createdAt: j['created_at'] != null ? DateTime.parse(j['created_at']) : null,
-  );
+  Future<List<Bureau>> getAllBureaux() async {
+    final res = await _sb.from('bureaux').select().eq('actif', true).order('region');
+    return (res as List).map((j) => Bureau.fromJson(j)).toList();
+  }
 
-  Map<String, dynamic> toJson() => {
-    'bureau_id': bureauId, 'heure': heure, 'votants': votants,
-    'statut': statut, 'saisi_par': saisiPar, 'offline': offline,
-  };
+  // ── Turnout Snapshots ────────────────────────────────────
+  Future<List<TurnoutSnapshot>> getSnapshotsBureau(String bureauId) async {
+    final res = await _sb
+        .from('turnout_snapshots')
+        .select()
+        .eq('bureau_id', bureauId)
+        .order('heure');
+    return (res as List).map((j) => TurnoutSnapshot.fromJson(j)).toList();
+  }
+
+  Future<bool> submitSnapshot({
+    required String bureauId, required int heure,
+    required int votants, required String saisiPar,
+  }) async {
+    try {
+      await _sb.from('turnout_snapshots').upsert({
+        'bureau_id': bureauId, 'heure': heure, 'votants': votants,
+        'saisi_par': saisiPar, 'statut': 'soumis', 'offline': false,
+      }, onConflict: 'bureau_id,heure');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> validerSnapshot(String snapshotId, String validesPar) async {
+    try {
+      await _sb.from('turnout_snapshots').update({
+        'statut': 'valide', 'valide_par': validesPar,
+      }).eq('id', snapshotId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> rejeterSnapshot(String snapshotId, String noteRejet, String validesPar) async {
+    try {
+      await _sb.from('turnout_snapshots').update({
+        'statut': 'rejete', 'note_rejet': noteRejet, 'valide_par': validesPar,
+      }).eq('id', snapshotId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ── PV Results ───────────────────────────────────────────
+  Future<PvResult?> getPvBureau(String bureauId) async {
+    try {
+      final res = await _sb.from('pv_results').select().eq('bureau_id', bureauId).single();
+      return PvResult.fromJson(res);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<PvResult>> getPvRegion(String region) async {
+    final bureaux = await getBureauxRegion(region);
+    final ids = bureaux.map((b) => b.id).toList();
+    if (ids.isEmpty) return [];
+    final res = await _sb.from('pv_results').select().inFilter('bureau_id', ids);
+    return (res as List).map((j) => PvResult.fromJson(j)).toList();
+  }
+
+  Future<List<PvResult>> getAllPv() async {
+    final res = await _sb.from('pv_results').select();
+    return (res as List).map((j) => PvResult.fromJson(j)).toList();
+  }
+
+  Future<bool> submitPv({
+    required String bureauId, required int votants, required int nuls,
+    required int voixA, required int voixB,
+    required String saisiPar, String? photoUrl,
+  }) async {
+    try {
+      await _sb.from('pv_results').upsert({
+        'bureau_id': bureauId, 'votants': votants, 'nuls': nuls,
+        'voix_a': voixA, 'voix_b': voixB, 'saisi_par': saisiPar,
+        'photo_url': photoUrl, 'statut': 'soumis', 'offline': false,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'bureau_id');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> validerPv(String pvId, String validesPar) async {
+    try {
+      await _sb.from('pv_results').update({'statut': 'valide', 'valide_par': validesPar}).eq('id', pvId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> rejeterPv(String pvId, String noteRejet, String validesPar) async {
+    try {
+      await _sb.from('pv_results').update({'statut': 'rejete', 'note_rejet': noteRejet, 'valide_par': validesPar}).eq('id', pvId);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // ── Dashboards (vues Supabase) ───────────────────────────
+  Future<Map<String, dynamic>?> getKpiNational() async {
+    try {
+      final res = await _sb.from('kpi_pv_national').select().single();
+      return res;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getKpiByRegion() async {
+    final res = await _sb.from('kpi_pv_by_region').select().order('region');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getLiveCoverage({String? commune}) async {
+    if (commune != null && commune.isNotEmpty) {
+      // Filtrage par commune via requête directe
+      final bureaux = await _sb.from('bureaux').select('id').eq('commune', commune);
+      final ids = (bureaux as List).map((b) => b['id'].toString()).toList();
+      if (ids.isEmpty) return [];
+      final snaps = await _sb.from('turnout_snapshots')
+          .select('heure, votants, bureau_id')
+          .inFilter('bureau_id', ids)
+          .order('heure');
+      // Agréger par heure
+      final Map<int, Map<String, dynamic>> byHeure = {};
+      final totalBureaux = ids.length;
+      for (final s in snaps as List) {
+        final h = s['heure'] as int;
+        if (!byHeure.containsKey(h)) {
+          byHeure[h] = {'heure': h, 'nb_snapshots': 0, 'bureaux_actifs': <String>{}, 'total_votants': 0, 'total_bureaux': totalBureaux};
+        }
+        byHeure[h]!['nb_snapshots'] = (byHeure[h]!['nb_snapshots'] as int) + 1;
+        (byHeure[h]!['bureaux_actifs'] as Set<String>).add(s['bureau_id'].toString());
+        byHeure[h]!['total_votants'] = (byHeure[h]!['total_votants'] as int) + (s['votants'] as int? ?? 0);
+      }
+      return byHeure.values.map((h) {
+        final actifs = (h['bureaux_actifs'] as Set<String>).length;
+        return {
+          'heure': h['heure'],
+          'nb_snapshots': h['nb_snapshots'],
+          'bureaux_actifs': actifs,
+          'bureaux_valides': actifs,
+          'total_bureaux': h['total_bureaux'],
+          'moy_votants': actifs > 0 ? h['total_votants'] / actifs : 0,
+          'taux_participation': 0,
+          'pct_couverture': totalBureaux > 0 ? (actifs / totalBureaux * 100) : 0,
+        };
+      }).toList()..sort((a, b) => (a['heure'] as int).compareTo(b['heure'] as int));
+    }
+    final res = await _sb.from('kpi_live_coverage_by_hour').select().order('heure');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getAnomalies() async {
+    final res = await _sb.from('v_audit_pv_anomalies').select().neq('niveau_anomalie', 'OK');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getComparaisonLivePv() async {
+    final res = await _sb.from('v_compare_live18_pv').select();
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  // ── Upload photo PV ──────────────────────────────────────
+  Future<String?> uploadPhotoPv(String bureauId, List<int> bytes) async {
+    try {
+      final path = 'pv/$bureauId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _sb.storage.from('pv-photos').uploadBinary(path, bytes);
+      final url = _sb.storage.from('pv-photos').getPublicUrl(path);
+      return url;
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
-// ── PvResult ─────────────────────────────────────────────────
-class PvResult {
-  final String? id, bureauId, saisiPar, validesPar, noteRejet, photoUrl;
-  final int votants, nuls, voixA, voixB;
-  final String statut;
-  final bool offline;
-  final DateTime? createdAt;
+// ============================================================
+//  OFFLINE SERVICE
+// ============================================================
+class OfflineService {
+  static const _keySnapshots = 'offline_snapshots';
+  static const _keyPv = 'offline_pv';
 
-  PvResult({
-    this.id, required this.bureauId, required this.votants,
-    required this.nuls, required this.voixA, required this.voixB,
-    required this.statut, this.saisiPar, this.validesPar,
-    this.noteRejet, this.photoUrl, this.offline = false, this.createdAt,
-  });
+  Future<void> saveSnapshotOffline(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keySnapshots) ?? [];
+    list.add(data.toString());
+    await prefs.setStringList(_keySnapshots, list);
+  }
 
-  int get exprimes => voixA + voixB;
-  double get pctA => exprimes > 0 ? voixA / exprimes * 100 : 0;
-  double get pctB => exprimes > 0 ? voixB / exprimes * 100 : 0;
-  double get pctNuls => votants > 0 ? nuls / votants * 100 : 0;
+  Future<void> savePvOffline(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_keyPv) ?? [];
+    list.add(data.toString());
+    await prefs.setStringList(_keyPv, list);
+  }
 
-  factory PvResult.fromJson(Map<String, dynamic> j) => PvResult(
-    id: j['id'], bureauId: j['bureau_id'],
-    votants: j['votants'] ?? 0, nuls: j['nuls'] ?? 0,
-    voixA: j['voix_a'] ?? 0, voixB: j['voix_b'] ?? 0,
-    statut: j['statut'] ?? 'soumis',
-    saisiPar: j['saisi_par'], validesPar: j['valide_par'],
-    noteRejet: j['note_rejet'], photoUrl: j['photo_url'],
-    offline: j['offline'] ?? false,
-    createdAt: j['created_at'] != null ? DateTime.parse(j['created_at']) : null,
-  );
-
-  Map<String, dynamic> toJson() => {
-    'bureau_id': bureauId, 'votants': votants, 'nuls': nuls,
-    'voix_a': voixA, 'voix_b': voixB, 'statut': statut,
-    'saisi_par': saisiPar, 'photo_url': photoUrl, 'offline': offline,
-  };
-}
-
-// ── Utilisateur ──────────────────────────────────────────────
-class Utilisateur {
-  final String id, codeUnique, nom, role;
-  final String? prenom, region, authId;
-
-  Utilisateur({
-    required this.id, required this.codeUnique,
-    required this.nom, required this.role,
-    this.prenom, this.region, this.authId,
-  });
-
-  factory Utilisateur.fromJson(Map<String, dynamic> j) => Utilisateur(
-    id: j['id'], codeUnique: j['code_unique'],
-    nom: j['nom'], role: j['role'],
-    prenom: j['prenom'], region: j['region'], authId: j['auth_id'],
-  );
+  Future<int> getPendingCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final s = prefs.getStringList(_keySnapshots) ?? [];
+    final p = prefs.getStringList(_keyPv) ?? [];
+    return s.length + p.length;
+  }
 }
