@@ -270,6 +270,72 @@ class DataService {
   }
 }
 
+
+  // ── Agents status ────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getAgentsStatus({String? commune}) async {
+    var q = _sb.from('v_agents_status').select();
+    if (commune != null && commune.isNotEmpty) {
+      q = q.eq('commune', commune);
+    }
+    final res = await q.order('statut').order('code_unique');
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  // ── Messages ─────────────────────────────────────────────
+  Future<List<Map<String, dynamic>>> getMessagesSent(String userId) async {
+    final res = await _sb.from('messages')
+        .select('*, destinataire:destinataire_id(code_unique)')
+        .eq('expediteur_id', userId)
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<List<Map<String, dynamic>>> getMessagesReceived(String userId, String? commune) async {
+    final res = await _sb.from('messages')
+        .select()
+        .or('destinataire_id.eq.$userId${commune != null ? ",commune.eq.$commune" : ""}')
+        .order('created_at', ascending: false);
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  Future<bool> envoyerMessage({
+    required String expediteurId,
+    required String destinataireId,
+    required String contenu,
+  }) async {
+    try {
+      await _sb.from('messages').insert({
+        'expediteur_id': expediteurId,
+        'destinataire_id': destinataireId,
+        'contenu': contenu,
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> envoyerBroadcast({
+    required String expediteurId,
+    String? commune,
+    required String contenu,
+  }) async {
+    try {
+      await _sb.from('messages').insert({
+        'expediteur_id': expediteurId,
+        'commune': commune,
+        'contenu': contenu,
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  Future<void> updateLastSeen(String userId) async {
+    try {
+      await _sb.from('utilisateurs')
+          .update({'last_seen': DateTime.now().toIso8601String()})
+          .eq('id', userId);
+    } catch (_) {}
+  }
+
 // ============================================================
 //  OFFLINE SERVICE
 // ============================================================
