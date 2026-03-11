@@ -522,6 +522,77 @@ jobs:
 
           }
 
+              Future<bool> updateInscrits(String bureauId, int inscrits) async {
+                try {
+                  await _sb.from('bureaux')
+                      .update({'inscrits': inscrits})
+                      .eq('id', bureauId);
+                  return true;
+                } catch (_) { return false; }
+              }
+
+              Future<bool> updateInscritsBulk(String commune, String centre, int inscrits) async {
+                try {
+                  await _sb.from('bureaux')
+                      .update({'inscrits': inscrits})
+                      .eq('commune', commune)
+                      .eq('centre', centre);
+                  return true;
+                } catch (_) { return false; }
+              }
+
+              Future<Map<String,dynamic>?> getBureauDetails(String bureauId) async {
+                try {
+                  final res = await _sb.from('bureaux').select().eq('id', bureauId).single();
+                  return Map<String,dynamic>.from(res);
+                } catch (_) { return null; }
+              }
+
+              Future<String?> uploadDocumentPhoto(String bureauId, String type, Uint8List bytes) async {
+                try {
+                  final path = 'docs/$bureauId/$type/${DateTime.now().millisecondsSinceEpoch}.jpg';
+                  await _sb.storage.from('pv-photos').uploadBinary(path, bytes);
+                  return _sb.storage.from('pv-photos').getPublicUrl(path);
+                } catch (_) { return null; }
+              }
+
+              Future<void> saveDocumentPhoto(String bureauId, String type, String url) async {
+                final col = type == 'ordre_mission' ? 'ordre_mission_photo' : 'ordonnance_photo';
+                await _sb.from('bureaux').update({col: url}).eq('id', bureauId);
+              }
+
+              Future<bool> soumettreDocuments({required String bureauId, required int ordreMission, required int ordonnance}) async {
+                try {
+                  await _sb.from('bureaux').update({
+                    'ordre_mission': ordreMission,
+                    'ordonnance': ordonnance,
+                  }).eq('id', bureauId);
+                  return true;
+                } catch (_) { return false; }
+              }
+
+              Future<bool> validerDocuments(String bureauId, String supId) async {
+                try {
+                  await _sb.from('bureaux').update({
+                    'documents_valides': true,
+                    'documents_valides_par': supId,
+                    'documents_valides_at': DateTime.now().toIso8601String(),
+                  }).eq('id', bureauId);
+                  return true;
+                } catch (_) { return false; }
+              }
+
+              Future<List<Map<String,dynamic>>> getDocumentsStatus({String? commune}) async {
+                try {
+                  final res = commune != null
+                    ? await _sb.from('v_documents_status').select().eq('commune', commune).order('code')
+                    : await _sb.from('v_documents_status').select().order('commune').order('code');
+                  return List<Map<String,dynamic>>.from(res as List);
+                } catch (_) { return []; }
+              }
+
+          }
+
           class OfflineService {
             static const _keySnapshots = 'offline_snapshots';
             static const _keyPv = 'offline_pv';
@@ -693,8 +764,10 @@ jobs:
           EOF
 
           # -- agent_bureau_detail.dart (simplified) ------------
-          cat > lib/screens/agent/agent_bureau_detail.dart << 'EOF'
+          cat > lib/screens/agent/agent_bureau_detail.dart << 'DETEOF'
+          import 'dart:typed_data';
           import 'package:flutter/material.dart';
+          import 'package:image_picker/image_picker.dart';
           import '../../models/models.dart';
           import '../../services/services.dart';
           import '../../utils/constants.dart';
@@ -705,20 +778,28 @@ jobs:
             const AgentBureauDetail({super.key, required this.bureau, required this.agentId});
             @override State<AgentBureauDetail> createState() => _AgentBureauDetailState();
           }
-          class _AgentBureauDetailState extends State<AgentBureauDetail> with SingleTickerProviderStateMixin {
+
+          class _AgentBureauDetailState extends State<AgentBureauDetail>
+              with SingleTickerProviderStateMixin {
             late TabController _tabs;
             final _data = DataService();
             List<TurnoutSnapshot> _snapshots = [];
             PvResult? _pv;
             bool _loading = true;
+            Map<String,dynamic> _bureau = {};
 
-            @override void initState() { super.initState(); _tabs = TabController(length: 2, vsync: this); _charger(); }
+            @override void initState() {
+              super.initState();
+              _tabs = TabController(length: 3, vsync: this);
+              _charger();
+            }
 
             Future<void> _charger() async {
               setState(() => _loading = true);
               final s = await _data.getSnapshotsBureau(widget.bureau.id);
               final p = await _data.getPvBureau(widget.bureau.id);
-              setState(() { _snapshots = s; _pv = p; _loading = false; });
+              final b = await _data.getBureauDetails(widget.bureau.id);
+              setState(() { _snapshots = s; _pv = p; _bureau = b ?? {}; _loading = false; });
             }
 
             int get _heureActuelle => DateTime.now().hour.clamp(AppConstants.heureOuverture, AppConstants.heureFermeture);
@@ -727,19 +808,29 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: Text(widget.bureau.nom),
+                appBar: AppBar(
+                  title: Text(widget.bureau.nom),
                   backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
-                  bottom: TabBar(controller: _tabs, labelColor: Colors.white, unselectedLabelColor: Colors.white60,
+                  bottom: TabBar(
+                    controller: _tabs,
+                    labelColor: Colors.white, unselectedLabelColor: Colors.white60,
                     indicatorColor: Colors.white,
-                    tabs: const [Tab(icon: Icon(Icons.access_time), text: 'Releve LIVE'),
-                      Tab(icon: Icon(Icons.assignment), text: 'PV Final')])),
-                body: _loading ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(controller: _tabs, children: [_tabLive(), _tabPv()]));
+                    tabs: const [
+                      Tab(icon: Icon(Icons.access_time), text: 'LIVE'),
+                      Tab(icon: Icon(Icons.assignment), text: 'PV Final'),
+                      Tab(icon: Icon(Icons.folder_open), text: 'Documents'),
+                    ]),
+                ),
+                body: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(controller: _tabs, children: [_tabLive(), _tabPv(), _tabDocuments()]),
+              );
             }
 
+            // 鈹€鈹€ TAB LIVE 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             Widget _tabLive() {
               final cVotants = TextEditingController();
-              return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
+              return SingleChildScrollView(padding: const EdgeInsets.all(16), children: [
                 Card(color: const Color(0xFFE8F5E9), child: Padding(padding: const EdgeInsets.all(14),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
                     _kpi('Inscrits', widget.bureau.inscrits.toString()),
@@ -758,35 +849,38 @@ jobs:
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
                     onPressed: () async {
                       final v = int.tryParse(cVotants.text);
-                      if (v == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saisissez un nombre valide'), backgroundColor: Colors.red)); return; }
-                      if (v > widget.bureau.inscritsCorriges) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Votants > Inscrits corriges!'), backgroundColor: Colors.red)); return; }
+                      if (v == null) return;
+                      if (v > widget.bureau.inscritsCorriges) return;
                       final ok = await _data.submitSnapshot(bureauId: widget.bureau.id, heure: _heureActuelle, votants: v, saisiPar: widget.agentId);
                       if (!mounted) return;
-                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Releve ${_heureActuelle}h transmis!'), backgroundColor: Colors.green)); _charger(); }
+                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Releve ${_heureActuelle}h envoye !'), backgroundColor: Colors.green)); _charger(); }
                     },
                     icon: const Icon(Icons.send), label: Text('Envoyer releve ${_heureActuelle}h')),
                 ])))
-                else Card(color: Colors.green.shade50, child: Padding(padding: const EdgeInsets.all(12),
+                else Card(color: Colors.green.shade50, child: Padding(padding: const EdgeInsets.all(14),
                   child: Row(children: [const Icon(Icons.check_circle, color: Colors.green), const SizedBox(width: 8),
                     Text('Releve ${_heureActuelle}h deja transmis', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold))]))),
                 const SizedBox(height: 12),
-                if (_snapshots.isNotEmpty) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Historique', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ..._snapshots.map((s) => ListTile(dense: true,
-                    leading: Text('${s.heure}h', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    title: Text('${s.votants} votants'),
-                    trailing: Icon(s.statut == 'valide' ? Icons.check_circle : s.statut == 'rejete' ? Icons.cancel : Icons.schedule,
-                      color: s.statut == 'valide' ? Colors.green : s.statut == 'rejete' ? Colors.red : Colors.orange))),
-                ]))),
-              ]));
+                if (_snapshots.isNotEmpty) Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Historique', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ..._snapshots.map((s) => ListTile(dense: true,
+                      leading: Text('${s.heure}h', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text('${s.votants} votants'),
+                      trailing: Icon(s.statut == 'valide' ? Icons.check_circle : s.statut == 'rejete' ? Icons.cancel : Icons.hourglass_bottom,
+                        color: s.statut == 'valide' ? Colors.green : s.statut == 'rejete' ? Colors.red : Colors.orange))),
+                  ]))),
+              ]);
             }
 
+            // 鈹€鈹€ TAB PV 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
             Widget _tabPv() {
               if (_pv?.statut == 'valide') return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.verified, color: Colors.green, size: 64),
                 const SizedBox(height: 12),
-                const Text('PV Valide [OK]', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
-                Text('Candidat A: ${_pv!.pctA.toStringAsFixed(1)}% | Candidat B: ${_pv!.pctB.toStringAsFixed(1)}%'),
+                const Text('PV Valide', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)),
+                Text('Cand. A: ${_pv!.pctA.toStringAsFixed(1)}% | Cand. B: ${_pv!.pctB.toStringAsFixed(1)}%'),
               ]));
               final cV = TextEditingController(text: _pv?.votants.toString() ?? '');
               final cN = TextEditingController(text: _pv?.nuls.toString() ?? '');
@@ -794,7 +888,7 @@ jobs:
               final cB = TextEditingController(text: _pv?.voixB.toString() ?? '');
               return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
                 if (_pv?.statut == 'rejete') Card(color: Colors.red.shade50, child: Padding(padding: const EdgeInsets.all(12),
-                  child: Text('[ERR] Rejete: ${_pv!.noteRejet ?? ""}', style: const TextStyle(color: Colors.red)))),
+                  child: Text('Rejete: ${_pv!.noteRejet ?? ""}', style: const TextStyle(color: Colors.red)))),
                 Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
                   const Text('PV Final', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
@@ -805,109 +899,180 @@ jobs:
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 48)),
                     onPressed: () async {
                       final v = int.tryParse(cV.text), n = int.tryParse(cN.text), a = int.tryParse(cA.text), b = int.tryParse(cB.text);
-                      if (v == null || n == null || a == null || b == null) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Remplissez tous les champs'), backgroundColor: Colors.red)); return; }
-                      if (v != n + a + b) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $v != $n + $a + $b'), backgroundColor: Colors.red)); return; }
+                      if (v == null || n == null || a == null || b == null) return;
+                      if (v != n + a + b) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Total incorrect !'), backgroundColor: Colors.red)); return; }
                       final ok = await _data.submitPv(bureauId: widget.bureau.id, votants: v, nuls: n, voixA: a, voixB: b, saisiPar: widget.agentId);
                       if (!mounted) return;
-                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV transmis!'), backgroundColor: Colors.green)); _charger(); }
+                      if (ok) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PV soumis !'), backgroundColor: Colors.green)); _charger(); }
                     },
                     icon: const Icon(Icons.send), label: const Text('Soumettre le PV')),
                 ]))),
               ]));
             }
 
+            // 鈹€鈹€ TAB DOCUMENTS 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+            Widget _tabDocuments() {
+              final omCtrl = TextEditingController(text: (_bureau['ordre_mission'] ?? 0).toString());
+              final ordCtrl = TextEditingController(text: (_bureau['ordonnance'] ?? 0).toString());
+              final hasOmPhoto = _bureau['ordre_mission_photo'] != null;
+              final hasOrdPhoto = _bureau['ordonnance_photo'] != null;
+              final docsValides = _bureau['documents_valides'] == true;
+
+              return SingleChildScrollView(padding: const EdgeInsets.all(16), child: Column(children: [
+
+                // Statut global
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: docsValides ? Colors.green.shade50 : Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: docsValides ? Colors.green : Colors.orange)),
+                  child: Row(children: [
+                    Icon(docsValides ? Icons.verified : Icons.pending, color: docsValides ? Colors.green : Colors.orange),
+                    const SizedBox(width: 8),
+                    Text(docsValides ? 'Documents valides par superviseur' : 'En attente de validation',
+                      style: TextStyle(fontWeight: FontWeight.bold, color: docsValides ? Colors.green : Colors.orange)),
+                  ]),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Ordres de mission
+                Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Row(children: [
+                    Icon(Icons.description, color: Color(0xFF1B5E20)),
+                    SizedBox(width: 8),
+                    Text('Ordres de Mission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ]),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: omCtrl,
+                    keyboardType: TextInputType.number,
+                    enabled: !docsValides,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre d'ordres de mission',
+                      prefixIcon: const Icon(Icons.numbers),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: OutlinedButton.icon(
+                      icon: Icon(hasOmPhoto ? Icons.check_circle : Icons.camera_alt,
+                        color: hasOmPhoto ? Colors.green : const Color(0xFF1B5E20)),
+                      label: Text(hasOmPhoto ? 'Photo OK' : 'Prendre photo',
+                        style: TextStyle(color: hasOmPhoto ? Colors.green : const Color(0xFF1B5E20))),
+                      onPressed: docsValides ? null : () => _prendrePhoto('ordre_mission'),
+                    )),
+                    if (hasOmPhoto) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.visibility, color: Colors.blue),
+                        onPressed: () => _voirPhoto(_bureau['ordre_mission_photo'])),
+                    ],
+                  ]),
+                ]))),
+
+                const SizedBox(height: 12),
+
+                // Ordonnances
+                Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Row(children: [
+                    Icon(Icons.gavel, color: Color(0xFF1B5E20)),
+                    SizedBox(width: 8),
+                    Text('Ordonnances', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  ]),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: ordCtrl,
+                    keyboardType: TextInputType.number,
+                    enabled: !docsValides,
+                    decoration: InputDecoration(
+                      labelText: 'Nombre d'ordonnances',
+                      prefixIcon: const Icon(Icons.numbers),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+                  const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: OutlinedButton.icon(
+                      icon: Icon(hasOrdPhoto ? Icons.check_circle : Icons.camera_alt,
+                        color: hasOrdPhoto ? Colors.green : const Color(0xFF1B5E20)),
+                      label: Text(hasOrdPhoto ? 'Photo OK' : 'Prendre photo',
+                        style: TextStyle(color: hasOrdPhoto ? Colors.green : const Color(0xFF1B5E20))),
+                      onPressed: docsValides ? null : () => _prendrePhoto('ordonnance'),
+                    )),
+                    if (hasOrdPhoto) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.visibility, color: Colors.blue),
+                        onPressed: () => _voirPhoto(_bureau['ordonnance_photo'])),
+                    ],
+                  ]),
+                ]))),
+
+                const SizedBox(height: 16),
+
+                if (!docsValides) ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1B5E20),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 52)),
+                  onPressed: () => _soumettreDocs(int.tryParse(omCtrl.text) ?? 0, int.tryParse(ordCtrl.text) ?? 0),
+                  icon: const Icon(Icons.cloud_upload),
+                  label: const Text('Soumettre les documents', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+              ]));
+            }
+
+            Future<void> _prendrePhoto(String type) async {
+              try {
+                final picker = ImagePicker();
+                final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 70, maxWidth: 1200);
+                if (picked == null) return;
+                final bytes = await picked.readAsBytes();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload en cours...')));
+                final url = await _data.uploadDocumentPhoto(widget.bureau.id, type, bytes);
+                if (url != null) {
+                  await _data.saveDocumentPhoto(widget.bureau.id, type, url);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Photo $type enregistree !'), backgroundColor: Colors.green));
+                  _charger();
+                }
+              } catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur photo: $e'), backgroundColor: Colors.red));
+              }
+            }
+
+            Future<void> _soumettreDocs(int om, int ord) async {
+              final ok = await _data.soumettreDocuments(bureauId: widget.bureau.id, ordreMission: om, ordonnance: ord);
+              if (!mounted) return;
+              if (ok) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Documents soumis au superviseur !'), backgroundColor: Colors.green));
+                _charger();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erreur de soumission'), backgroundColor: Colors.red));
+              }
+            }
+
+            void _voirPhoto(String? url) {
+              if (url == null) return;
+              showDialog(context: context, builder: (ctx) => Dialog(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  AppBar(title: const Text('Photo document'), leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx))),
+                  Image.network(url, fit: BoxFit.contain),
+                ]),
+              ));
+            }
+
             Widget _kpi(String l, String v, {bool bold = false}) => Column(children: [
-              Text(v, style: TextStyle(fontSize: bold ? 22 : 18, fontWeight: FontWeight.bold, color: bold ? const Color(0xFF1B5E20) : Colors.black87)),
+              Text(v, style: TextStyle(fontSize: bold ? 22 : 18, fontWeight: FontWeight.bold, color: const Color(0xFF1B5E20))),
               Text(l, style: const TextStyle(fontSize: 10, color: Colors.grey))]);
 
             Widget _champPv(String label, TextEditingController ctrl) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: TextField(controller: ctrl, keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: label,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))));
+                decoration: InputDecoration(labelText: label, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))));
           }
-          EOF
-
-          # -- superviseur_home.dart -----------------------------
-          cat > lib/screens/superviseur/superviseur_home.dart << 'EOF'
-          import 'package:flutter/material.dart';
-          import '../../services/services.dart';
-          import '../../utils/constants.dart';
-          import '../login_screen.dart';
-          import 'dashboard_national.dart';
-          import 'dashboard_live.dart';
-          import 'agents_screen.dart';
-
-          class SuperviseurHome extends StatefulWidget {
-            const SuperviseurHome({super.key});
-            @override
-            State<SuperviseurHome> createState() => _SuperviseurHomeState();
-          }
-
-          class _SuperviseurHomeState extends State<SuperviseurHome> {
-            int _page = 0;
-            String _nom = '', _role = '';
-
-            @override
-            void initState() {
-              super.initState();
-              _init();
-            }
-
-            Future<void> _init() async {
-              final auth = AuthService();
-              final nom  = await auth.getUserNom();
-              final role = await auth.getUserRole();
-              setState(() {
-                _nom  = nom ?? '';
-                _role = role ?? '';
-              });
-            }
-
-            Future<void> _logout() async {
-              await AuthService().logout();
-              if (!mounted) return;
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-            }
-
-            final _pages = const [
-              DashboardNational(),
-              DashboardLive(),
-              AgentsScreen(),
-              ValidationScreen(),
-              AnomaliesScreen(),
-            ];
-
-            @override
-            Widget build(BuildContext context) {
-              final isNational = _role == AppRoles.superviseurNational;
-              return Scaffold(
-                appBar: AppBar(
-                  title: Text(isNational ? 'Dashboard National' : 'Dashboard Regional'),
-                  actions: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Center(child: Text(_nom,
-                          style: const TextStyle(fontSize: 13, color: Colors.white70))),
-                    ),
-                    IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
-                  ],
-                ),
-                body: _pages[_page],
-                bottomNavigationBar: NavigationBar(
-                  selectedIndex: _page,
-                  onDestinationSelected: (i) => setState(() => _page = i),
-                  destinations: const [
-                    NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Resultats'),
-                    NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
-                    NavigationDestination(icon: Icon(Icons.people), label: 'Agents'),
-                    NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
-                    NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies'),
-                  ],
-                ),
-              );
-            }
-          }
+          DETEOF
           EOF
 
           # Copy dashboard files from uploaded versions (they have correct content)
@@ -1372,7 +1537,495 @@ jobs:
           }
           AEOF
 
-          # Fix imports in dashboard files
+          # -- inscrits_screen.dart ----------------------------
+          cat > lib/screens/superviseur/inscrits_screen.dart << 'IEOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+
+          class InscritsBureaux extends StatefulWidget {
+            const InscritsBureaux({super.key});
+            @override State<InscritsBureaux> createState() => _InscritsBureauxState();
+          }
+
+          class _InscritsBureauxState extends State<InscritsBureaux> {
+            final _data = DataService();
+            List<Map<String,dynamic>> _bureaux = [];
+            List<Map<String,dynamic>> _filtered = [];
+            bool _loading = true;
+            String _searchCommune = '';
+            String _searchCentre = '';
+
+            @override void initState() { super.initState(); _charger(); }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final res = await _data.getAllBureaux();
+                setState(() {
+                  _bureaux = (res as List).map((b) => {
+                    'id': b.id, 'code': b.code, 'nom': b.nom,
+                    'commune': b.commune, 'centre': b.centre,
+                    'inscrits': b.inscrits,
+                  }).toList();
+                  _filtered = List.from(_bureaux);
+                });
+              } finally { setState(() => _loading = false); }
+            }
+
+            void _filtrer(String val) {
+              setState(() {
+                _filtered = _bureaux.where((b) =>
+                  b['centre'].toString().toLowerCase().contains(val.toLowerCase()) ||
+                  b['commune'].toString().toLowerCase().contains(val.toLowerCase()) ||
+                  b['code'].toString().toLowerCase().contains(val.toLowerCase())
+                ).toList();
+              });
+            }
+
+            Future<void> _modifier(Map<String,dynamic> bureau) async {
+              final ctrl = TextEditingController(text: bureau['inscrits'].toString());
+              final result = await showDialog<int>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text('Modifier inscrits'),
+                  content: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('${bureau['code']} - ${bureau['centre']}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: ctrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre d'inscrits',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.people),
+                      ),
+                      autofocus: true,
+                    ),
+                  ]),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white),
+                      onPressed: () {
+                        final val = int.tryParse(ctrl.text);
+                        if (val != null && val > 0) Navigator.pop(ctx, val);
+                      },
+                      child: const Text('Enregistrer'),
+                    ),
+                  ],
+                ),
+              );
+
+              if (result == null) return;
+              final ok = await _data.updateInscrits(bureau['id'].toString(), result);
+              if (ok) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${bureau['code']}: $result inscrits'), backgroundColor: Colors.green));
+                _charger();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Erreur de mise a jour'), backgroundColor: Colors.red));
+              }
+            }
+
+            Future<void> _modifierToutCentre(String commune, String centre) async {
+              final ctrl = TextEditingController(text: '440');
+              final bureaux = _bureaux.where((b) => b['commune']==commune && b['centre']==centre).toList();
+              final result = await showDialog<int>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Modifier tous les bureaux'),
+                  content: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Centre: $centre (${bureaux.length} bureaux)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: ctrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Inscrits par bureau',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.people),
+                      ),
+                      autofocus: true,
+                    ),
+                  ]),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white),
+                      onPressed: () {
+                        final val = int.tryParse(ctrl.text);
+                        if (val != null && val > 0) Navigator.pop(ctx, val);
+                      },
+                      child: const Text('Appliquer a tous'),
+                    ),
+                  ],
+                ),
+              );
+              if (result == null) return;
+              final ok = await _data.updateInscritsBulk(commune, centre, result);
+              if (ok) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('$centre: $result inscrits/bureau'), backgroundColor: Colors.green));
+                _charger();
+              }
+            }
+
+            @override Widget build(BuildContext context) {
+              if (_loading) return const Center(child: CircularProgressIndicator(color: Color(0xFF1B5E20)));
+
+              final total = _bureaux.fold<int>(0, (s, b) => s + (b['inscrits'] as int? ?? 0));
+
+              return Column(children: [
+                Container(
+                  color: const Color(0xFF1B5E20),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(children: [
+                    const Icon(Icons.people, color: Colors.white),
+                    const SizedBox(width: 8),
+                    Text('Total inscrits: ${total.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '\${m[1]},')}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const Spacer(),
+                    Text('${_bureaux.length} bureaux', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                  ]),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: TextField(
+                    onChanged: _filtrer,
+                    decoration: InputDecoration(
+                      hintText: 'Rechercher commune / centre...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    ),
+                  ),
+                ),
+                Expanded(child: RefreshIndicator(
+                  onRefresh: _charger,
+                  child: _buildListe(),
+                )),
+              ]);
+            }
+
+            Widget _buildListe() {
+              final parCommune = <String, Map<String, List<Map<String,dynamic>>>>{};
+              for (final b in _filtered) {
+                final com = b['commune'] as String;
+                final cen = b['centre'] as String;
+                parCommune.putIfAbsent(com, () => {});
+                parCommune[com]!.putIfAbsent(cen, () => []);
+                parCommune[com]![cen]!.add(b);
+              }
+
+              return ListView(children: [
+                for (final commune in parCommune.keys.toList()..sort((a,b) => b.compareTo(a))) ...[
+                  Container(
+                    color: const Color(0xFF1B5E20),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Text('馃搷 $commune',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                  for (final centre in parCommune[commune]!.keys.toList()..sort()) ...[
+                    Container(
+                      color: Colors.grey[200],
+                      child: ListTile(
+                        dense: true,
+                        title: Text(centre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        subtitle: Text('${parCommune[commune]![centre]!.length} bureaux'),
+                        trailing: TextButton.icon(
+                          icon: const Icon(Icons.edit, size: 16),
+                          label: const Text('Tous', style: TextStyle(fontSize: 12)),
+                          onPressed: () => _modifierToutCentre(commune, centre),
+                        ),
+                      ),
+                    ),
+                    for (final b in parCommune[commune]![centre]!) ...[
+                      ListTile(
+                        dense: true,
+                        leading: Text(b['code'], style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF1B5E20))),
+                        title: Text(b['nom'] ?? '', style: const TextStyle(fontSize: 13)),
+                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                          Text('${b['inscrits']}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20))),
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 20, color: Colors.orange),
+                            onPressed: () => _modifier(b),
+                          ),
+                        ]),
+                      ),
+                      const Divider(height: 1),
+                    ],
+                  ],
+                ],
+              ]);
+            }
+          }
+          IEOF
+
+          # -- documents_supervision.dart ----------------------
+          cat > lib/screens/superviseur/documents_supervision.dart << 'DSEOF'
+          import 'package:flutter/material.dart';
+          import '../../services/services.dart';
+
+          class DocumentsSupervision extends StatefulWidget {
+            final String? commune;
+            const DocumentsSupervision({super.key, this.commune});
+            @override State<DocumentsSupervision> createState() => _DocumentsSupervisionState();
+          }
+
+          class _DocumentsSupervisionState extends State<DocumentsSupervision> {
+            final _data = DataService();
+            List<Map<String,dynamic>> _docs = [];
+            bool _loading = true;
+            String _filtre = 'tous';
+            String? _userId;
+
+            @override void initState() { super.initState(); _init(); }
+
+            Future<void> _init() async {
+              _userId = await _data.getUserId();
+              _charger();
+            }
+
+            Future<void> _charger() async {
+              setState(() => _loading = true);
+              try {
+                final res = await _data.getDocumentsStatus(commune: widget.commune);
+                setState(() => _docs = res);
+              } finally { setState(() => _loading = false); }
+            }
+
+            List<Map<String,dynamic>> get _filtered {
+              if (_filtre == 'tous') return _docs;
+              return _docs.where((d) => d['statut_documents'] == _filtre).toList();
+            }
+
+            @override Widget build(BuildContext context) {
+              final total = _docs.length;
+              final valides = _docs.where((d) => d['documents_valides'] == true).length;
+              final soumis = _docs.where((d) => d['statut_documents'] == 'soumis').length;
+              final enAttente = _docs.where((d) => d['statut_documents'] == 'en_attente').length;
+
+              return Column(children: [
+                // Stats bar
+                Container(color: const Color(0xFF1B5E20), padding: const EdgeInsets.all(12),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                    _stat('Total', total.toString(), Colors.white),
+                    _stat('Soumis', soumis.toString(), Colors.orange),
+                    _stat('Valides', valides.toString(), Colors.greenAccent),
+                    _stat('En attente', enAttente.toString(), Colors.grey[300]!),
+                  ])),
+
+                // Filtres
+                SingleChildScrollView(scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(children: [
+                    for (final f in ['tous','soumis','valide','en_attente'])
+                      Padding(padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(f == 'en_attente' ? 'En attente' : f == 'valide' ? 'Valides' : f[0].toUpperCase() + f.substring(1)),
+                          selected: _filtre == f,
+                          selectedColor: const Color(0xFF1B5E20),
+                          labelStyle: TextStyle(color: _filtre == f ? Colors.white : Colors.black),
+                          onSelected: (_) => setState(() => _filtre = f),
+                        )),
+                  ])),
+
+                // Liste
+                Expanded(child: RefreshIndicator(
+                  onRefresh: _charger,
+                  child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filtered.isEmpty
+                      ? const Center(child: Text('Aucun document'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          itemCount: _filtered.length,
+                          itemBuilder: (ctx, i) {
+                            final d = _filtered[i];
+                            final statut = d['statut_documents'] ?? 'en_attente';
+                            final valide = d['documents_valides'] == true;
+                            final color = valide ? Colors.green : statut == 'soumis' ? Colors.orange : Colors.grey;
+
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              shape: RoundedRectangleBorder(side: BorderSide(color: color.withOpacity(0.4)), borderRadius: BorderRadius.circular(10)),
+                              child: ExpansionTile(
+                                leading: CircleAvatar(backgroundColor: color.withOpacity(0.15),
+                                  child: Icon(valide ? Icons.verified : statut == 'soumis' ? Icons.pending : Icons.hourglass_empty, color: color, size: 20)),
+                                title: Text('${d['code']} - ${d['centre'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                subtitle: Text('Agent: ${d['agent_nom'] ?? d['agent_code'] ?? 'N/A'} | ${d['commune'] ?? ''}', style: const TextStyle(fontSize: 11)),
+                                trailing: valide ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                                children: [
+                                  Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: Column(children: [
+                                    // Ordres de mission
+                                    _docRow('Ordres de mission', d['ordre_mission']?.toString() ?? '0', d['ordre_mission_photo'], d['a_photo_om'] == true),
+                                    const Divider(),
+                                    // Ordonnances
+                                    _docRow('Ordonnances', d['ordonnance']?.toString() ?? '0', d['ordonnance_photo'], d['a_photo_ord'] == true),
+                                    const SizedBox(height: 12),
+                                    // Bouton valider
+                                    if (statut == 'soumis' && !valide)
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 44)),
+                                        icon: const Icon(Icons.verified),
+                                        label: const Text('Valider les documents'),
+                                        onPressed: () async {
+                                          final ok = await _data.validerDocuments(d['id'].toString(), _userId ?? '');
+                                          if (!mounted) return;
+                                          if (ok) {
+                                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Documents valides !'), backgroundColor: Colors.green));
+                                            _charger();
+                                          }
+                                        }),
+                                    if (valide) ...[
+                                      const Icon(Icons.verified, color: Colors.green, size: 32),
+                                      Text('Valide par ${d['documents_valides_par'] ?? 'superviseur'}', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ])),
+                                ],
+                              ),
+                            );
+                          }),
+                )),
+              ]);
+            }
+
+            Widget _docRow(String label, String count, dynamic photoUrl, bool hasPhoto) {
+              return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  Text('Nombre: $count', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ])),
+                if (hasPhoto && photoUrl != null)
+                  TextButton.icon(
+                    icon: const Icon(Icons.visibility, size: 16),
+                    label: const Text('Photo', style: TextStyle(fontSize: 12)),
+                    onPressed: () => _voirPhoto(photoUrl.toString())),
+                if (!hasPhoto) const Text('Pas de photo', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              ]));
+            }
+
+            Widget _stat(String label, String val, Color color) => Column(children: [
+              Text(val, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(label, style: TextStyle(color: color.withOpacity(0.8), fontSize: 10)),
+            ]);
+
+            void _voirPhoto(String url) {
+              showDialog(context: context, builder: (ctx) => Dialog(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  AppBar(title: const Text('Photo document'), backgroundColor: const Color(0xFF1B5E20), foregroundColor: Colors.white,
+                    leading: IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx))),
+                  Image.network(url, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const Padding(padding: EdgeInsets.all(20), child: Text('Impossible de charger la photo'))),
+                ]),
+              ));
+            }
+          }
+          DSEOF
+
+          # 鈹€鈹€ superviseur_home.dart complet (avec Documents + Inscrits) 鈹€鈹€
+          cat > lib/screens/superviseur/superviseur_home.dart << 'SHEOF'
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+          import '../login_screen.dart';
+          import '../../services/services.dart';
+          import '../../utils/constants.dart';
+          import 'dashboard_national.dart';
+          import 'dashboard_live.dart';
+          import 'agents_screen.dart';
+          import 'validation_screen.dart';
+          import 'anomalies_screen.dart';
+          import 'inscrits_screen.dart';
+          import 'documents_supervision.dart';
+
+          class SuperviseurHome extends StatefulWidget {
+            const SuperviseurHome({super.key});
+            @override State<SuperviseurHome> createState() => _SuperviseurHomeState();
+          }
+
+          class _SuperviseurHomeState extends State<SuperviseurHome> {
+            int _page = 0;
+            String _nom = '', _role = '', _commune = '';
+
+            @override void initState() { super.initState(); _init(); }
+
+            Future<void> _init() async {
+              final auth = AuthService();
+              final nom    = await auth.getUserNom();
+              final role   = await auth.getUserRole();
+              final comm   = await auth.getUserCommune();
+              setState(() {
+                _nom     = nom    ?? '';
+                _role    = role   ?? '';
+                _commune = comm   ?? '';
+              });
+            }
+
+            Future<void> _logout() async {
+              await AuthService().logout();
+              if (!mounted) return;
+              Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+            }
+
+            bool get _isNational => _role == AppRoles.superviseurNational;
+
+            List<Widget> get _pages => [
+              const DashboardNational(),
+              const DashboardLive(),
+              const AgentsScreen(),
+              const ValidationScreen(),
+              const AnomaliesScreen(),
+              DocumentsSupervision(commune: _isNational ? null : _commune),
+              if (_isNational) const InscritsBureaux(),
+            ];
+
+            List<NavigationDestination> get _destinations => [
+              const NavigationDestination(icon: Icon(Icons.bar_chart),    label: 'Resultats'),
+              const NavigationDestination(icon: Icon(Icons.access_time),  label: 'LIVE'),
+              const NavigationDestination(icon: Icon(Icons.people),       label: 'Agents'),
+              const NavigationDestination(icon: Icon(Icons.fact_check),   label: 'Validation'),
+              const NavigationDestination(icon: Icon(Icons.warning),      label: 'Anomalies'),
+              const NavigationDestination(icon: Icon(Icons.folder_open),  label: 'Documents'),
+              if (_isNational) const NavigationDestination(icon: Icon(Icons.how_to_reg), label: 'Inscrits'),
+            ];
+
+            @override
+            Widget build(BuildContext context) {
+              // Garde : attendre que _role soit charg茅
+              if (_role.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+
+              // S茅curit茅 : si _page d茅passe la liste (ex. apr猫s rechargement de r么le)
+              if (_page >= _pages.length) _page = 0;
+
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text(_isNational ? 'Dashboard National' : 'Dashboard Regional'),
+                  backgroundColor: const Color(0xFF1B5E20),
+                  foregroundColor: Colors.white,
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Center(child: Text(_nom, style: const TextStyle(fontSize: 13, color: Colors.white70))),
+                    ),
+                    IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+                  ],
+                ),
+                body: IndexedStack(index: _page, children: _pages),
+                bottomNavigationBar: NavigationBar(
+                  selectedIndex: _page,
+                  onDestinationSelected: (i) => setState(() => _page = i),
+                  destinations: _destinations,
+                ),
+              );
+            }
+          }
+          SHEOF
+          echo "鉁� superviseur_home.dart 茅crit"
+
+                    # Fix imports in dashboard files
           find lib/screens/superviseur -name "*.dart" | xargs sed -i \
             -e "s|import '../../services/auth_service.dart'|import '../../services/services.dart'|g" \
             -e "s|import 'services/auth_service.dart'|import '../../services/services.dart'|g" \
