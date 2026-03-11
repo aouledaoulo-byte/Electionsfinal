@@ -1309,7 +1309,7 @@ jobs:
               setState(() => _loading = true);
               try {
                 final res = await _data.getPvResults();
-                setState(() { _items = res.where((r) => r.statut == 'soumis').toList(); });
+                setState(() { _items = res.where((r) => r['statut'] == 'soumis').toList(); });
               } finally { setState(() => _loading = false); }
             }
 
@@ -1325,19 +1325,19 @@ jobs:
                     return Card(
                       margin: const EdgeInsets.all(8),
                       child: ListTile(
-                        title: Text('Bureau: ${pv.bureauId ?? ""}'),
-                        subtitle: Text('Votants: ${pv.votants} | Voix A: ${pv.voixA} | Voix B: ${pv.voixB}'),
+                        title: Text('Bureau: ${pv['bureau_id'] ?? ""}'),
+                        subtitle: Text('Votants: ${pv['votants']} | Voix A: ${pv['voix_a']} | Voix B: ${pv['voix_b']}'),
                         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                           IconButton(icon: const Icon(Icons.check_circle, color: Colors.green),
                             onPressed: () async {
                               final uid = await _data.getUserId() ?? '';
-                              await _data.validerPv(pv.id!, uid);
+                              await _data.validerPv(pv['id'] as String, uid);
                               _charger();
                             }),
                           IconButton(icon: const Icon(Icons.cancel, color: Colors.red),
                             onPressed: () async {
                               final uid = await _data.getUserId() ?? '';
-                              await _data.rejeterPv(pv.id!, uid, 'Rejete');
+                              await _data.rejeterPv(pv['id'] as String, uid, 'Rejete');
                               _charger();
                             }),
                         ]),
