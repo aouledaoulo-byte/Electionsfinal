@@ -42,7 +42,7 @@ jobs:
           flutter:
             uses-material-design: true
           dependency_overrides:
-            app_links: 4.0.3
+            app_links: 3.4.3
           PUBSPEC
 
       - name: Create lib directories
