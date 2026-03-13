@@ -28,96 +28,18 @@ jobs:
           cp -r /tmp/myapp/android .
           cp -r /tmp/myapp/test . 2>/dev/null || true
 
-      - name: Fix android/build.gradle (Kotlin version)
-        run: |
-          cat > android/build.gradle << 'EOF'
-          buildscript {
-              ext.kotlin_version = '1.9.10'
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.0'
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:"
-              }
-          }
-
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-
-          rootProject.buildDir = '../build'
-          subprojects {
-              project.buildDir = "${rootProject.buildDir}/${project.name}"
-          }
-          subprojects {
-              project.evaluationDependsOn(':app')
-          }
-
-          tasks.register("clean", Delete) {
-              delete rootProject.buildDir
-          }
-          EOF
-
-      - name: Fix android/app/build.gradle
-        run: |
-          cat > android/app/build.gradle << 'EOF'
-          plugins {
-              id "com.android.application"
-              id "kotlin-android"
-              id "dev.flutter.flutter-gradle-plugin"
-          }
-
-          android {
-              namespace "com.election"
-              compileSdkVersion 34
-
-              defaultConfig {
-                  applicationId "com.election"
-                  minSdkVersion 21
-                  targetSdkVersion 34
-                  versionCode 1
-                  versionName "1.0.0"
-              }
-
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.debug
-                  }
-              }
-          }
-
-          flutter {
-              source "../.."
-          }
-          EOF
-
-      - name: Fix gradle wrapper version
-        run: |
-          cat > android/gradle/wrapper/gradle-wrapper.properties << 'EOF'
-          distributionBase=GRADLE_USER_HOME
-          distributionPath=wrapper/dists
-          zipStoreBase=GRADLE_USER_HOME
-          zipStorePath=wrapper/dists
-          distributionUrl=https\://services.gradle.org/distributions/gradle-8.3-bin.zip
-          EOF
-
       - name: Create pubspec.yaml
         run: |
           cat > pubspec.yaml << 'PUBSPEC'
           name: election
-          description: Election 2026 monitoring app
+          description: Election 2026
           version: 1.0.0+1
           environment:
             sdk: ">=3.0.0 <4.0.0"
           dependencies:
             flutter:
               sdk: flutter
-            supabase_flutter: ^2.3.0
+            supabase_flutter: 1.10.25
             cupertino_icons: ^1.0.6
           dev_dependencies:
             flutter_test:
@@ -125,8 +47,6 @@ jobs:
             flutter_lints: ^3.0.0
           flutter:
             uses-material-design: true
-          dependency_overrides:
-            app_links: 3.4.3
           PUBSPEC
 
       - name: Create lib directories
