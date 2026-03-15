@@ -526,44 +526,7 @@ class _CartesSuiviScreenState extends State<CartesSuiviScreen>
       child: ListView(padding: const EdgeInsets.all(12), children: [
 
         // Sélecteur semaine
-        Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Row(children: [
-              Icon(Icons.calendar_view_week, color: Color(0xFF1B5E20), size: 18),
-              SizedBox(width: 8),
-              Text('Sélectionner une semaine',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-            ]),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(children: semaines.asMap().entries.map((entry) {
-                final i = entry.key; final sem = entry.value;
-                final fin = sem.add(const Duration(days: 6));
-                final isSel = !_lundiSemaine.isBefore(sem) &&
-                    _lundiSemaine.isBefore(fin.add(const Duration(days: 1)));
-                final retW = List.generate(7, (j) => sem.add(Duration(days: j)))
-                    .fold(0, (s, d) => s + _getJourRet(d, statsDate));
-                return GestureDetector(
-                  onTap: () => setState(() => _semaineSelect = sem),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSel ? const Color(0xFF1B5E20) : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(8)),
-                    child: Column(children: [
-                      Text('S${i+1}', style: TextStyle(fontWeight: FontWeight.bold,
-                          fontSize: 12, color: isSel ? Colors.white : Colors.black87)),
-                      Text('${sem.day}/${sem.month}', style: TextStyle(fontSize: 9,
-                          color: isSel ? Colors.white70 : Colors.grey)),
-                      if (retW > 0) Text('$retW', style: TextStyle(fontSize: 8,
-                          color: isSel ? Colors.greenAccent : Colors.green[600],
-                          fontWeight: FontWeight.bold)),
-                    ])));
-              }).toList())),
-          ])));
+        _buildSemainePicker(semaines, statsDate),
 
         const SizedBox(height: 10),
 
