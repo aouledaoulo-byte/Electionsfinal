@@ -476,22 +476,25 @@ class ElectionService {
   Future<bool> soumettreRetraitCartes(String bureauId, String agentCode,
       int nbRetraits, int nbNonRetraits, String? observations) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    final data = {
+    // Upsert dans retrait_cartes — visible immédiatement par le superviseur
+    final ok = await _Supa.upsert('retrait_cartes', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
       'nb_retraits': nbRetraits,
       'nb_non_retraits': nbNonRetraits,
       'observations': observations,
-      'valide': false,
       'date_saisie': today,
-      'updated_at': DateTime.now().toIso8601String(),
-      'created_at': DateTime.now().toIso8601String(),
-    };
-    // Mettre à jour le dernier retrait connu
-    await _Supa.upsert('retrait_cartes', data);
-    // Enregistrer dans l'historique par jour
-    await _Supa.upsert('retrait_cartes_historique', data);
-    return true;
+      'valide': false,
+    });
+    // Historique journalier
+    await _Supa.upsert('retrait_cartes_historique', {
+      'bureau_id': bureauId,
+      'agent_code': agentCode,
+      'nb_retraits': nbRetraits,
+      'nb_non_retraits': nbNonRetraits,
+      'date_saisie': today,
+    });
+    return ok;
   }
 
   Future<bool> validerRetraitCartes(String retraitId) =>
