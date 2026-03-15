@@ -18,14 +18,13 @@ class _CartesScreenState extends State<CartesScreen> {
   bool _saving = false;
 
   static final DateTime _debut = DateTime(2026, 3, 10);
-  static final DateTime _fin   = DateTime(2026, 4, 10, 18); // 10/04 jusqu'à 18h inclus
+  static final DateTime _fin   = DateTime(2026, 4, 10, 18);
 
   DateTime _dateSelect = DateTime.now();
   int _heureSelect = DateTime.now().hour == 0 ? 1 : DateTime.now().hour;
 
   final _ctrl = TextEditingController();
 
-  // Jours restants
   int get _joursRestants {
     final diff = _fin.difference(DateTime.now()).inDays;
     return diff < 0 ? 0 : diff;
@@ -34,11 +33,9 @@ class _CartesScreenState extends State<CartesScreen> {
   bool get _dansPeriode =>
       !DateTime.now().isBefore(_debut) && !DateTime.now().isAfter(_fin);
 
-  // Dernier relevé horaire du jour
   RetraitCartesHoraire? get _dernierHoraire => _horaires.isEmpty ? null
       : _horaires.reduce((a, b) => a.heure > b.heure ? a : b);
 
-  // Relevé existant pour l'heure sélectionnée
   RetraitCartesHoraire? get _releveHeure {
     try { return _horaires.firstWhere((h) => h.heure == _heureSelect); }
     catch (_) { return null; }
@@ -72,12 +69,10 @@ class _CartesScreenState extends State<CartesScreen> {
     setState(() => _loading = true);
     final r = await _svc.getRetraitCartes(widget.bureau.id);
     final h = await _svc.getRetraitsHorairesBureau(widget.bureau.id, _dateSelect);
-    // Pré-remplir avec le relevé de l'heure sélectionnée
     final existing = h.where((e) => e.heure == _heureSelect).toList();
     if (existing.isNotEmpty) {
       _ctrl.text = existing.first.nbRetraits.toString();
     } else if (_ctrl.text.isEmpty && h.isNotEmpty) {
-      // Pré-remplir avec le dernier relevé du jour
       final last = h.reduce((a, b) => a.heure > b.heure ? a : b);
       _ctrl.text = last.nbRetraits.toString();
     }
@@ -115,7 +110,6 @@ class _CartesScreenState extends State<CartesScreen> {
     );
   }
 
-  // ── Phase card ─────────────────────────────────────
   Widget _phaseCard() {
     final urgent = _joursRestants <= 7;
     final color = urgent ? Colors.red : const Color(0xFF1B5E20);
@@ -144,7 +138,6 @@ class _CartesScreenState extends State<CartesScreen> {
     );
   }
 
-  // ── Bureau card ────────────────────────────────────
   Widget _bureauCard() {
     final dernierTaux = _retraitJour != null && widget.bureau.inscrits > 0
         ? _retraitJour!.nbRetraits / widget.bureau.inscrits * 100 : 0.0;
@@ -197,7 +190,6 @@ class _CartesScreenState extends State<CartesScreen> {
     );
   }
 
-  // ── Saisie card ────────────────────────────────────
   Widget _saisieCard() {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -223,8 +215,6 @@ class _CartesScreenState extends State<CartesScreen> {
               ),
           ]),
           const SizedBox(height: 14),
-
-          // Ligne date + heure
           Row(children: [
             Expanded(
               child: InkWell(
@@ -279,7 +269,6 @@ class _CartesScreenState extends State<CartesScreen> {
                   if (existing.isNotEmpty) {
                     _ctrl.text = existing.first.nbRetraits.toString();
                   } else {
-                    // Pré-remplir avec le dernier relevé < heure sélectionnée
                     final prev = _horaires.where((e) => e.heure < v!).toList();
                     if (prev.isNotEmpty) {
                       final last = prev.reduce((a, b) => a.heure > b.heure ? a : b);
@@ -291,8 +280,6 @@ class _CartesScreenState extends State<CartesScreen> {
             ),
           ]),
           const SizedBox(height: 12),
-
-          // Saisie nombre retirées
           TextField(
             controller: _ctrl,
             keyboardType: TextInputType.number,
@@ -308,8 +295,6 @@ class _CartesScreenState extends State<CartesScreen> {
             ),
           ),
           const SizedBox(height: 10),
-
-          // Non retirées — calculé auto + indicateur visuel
           if (_ctrl.text.isNotEmpty) ...[
             Container(
               padding: const EdgeInsets.all(12),
@@ -359,7 +344,6 @@ class _CartesScreenState extends State<CartesScreen> {
             ),
             const SizedBox(height: 12),
           ],
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -383,7 +367,6 @@ class _CartesScreenState extends State<CartesScreen> {
     );
   }
 
-  // ── Historique horaire du jour ─────────────────────
   Widget _historiqueJour() {
     final maxRet = _horaires.isEmpty ? 1
         : _horaires.map((h) => h.nbRetraits).reduce((a, b) => a > b ? a : b);
@@ -465,11 +448,13 @@ class _CartesScreenState extends State<CartesScreen> {
     );
   }
 
+  // ✅ CORRECTION : vérification des retours + message d'erreur réel
   Future<void> _enregistrer() async {
     final retraits = int.tryParse(_ctrl.text);
     if (retraits == null || retraits < 0) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Entrez un nombre valide'), backgroundColor: Colors.red));
+          content: Text('Entrez un nombre valide'),
+          backgroundColor: Colors.red));
       return;
     }
     if (retraits > widget.bureau.inscrits) {
@@ -487,13 +472,22 @@ class _CartesScreenState extends State<CartesScreen> {
     }
     setState(() => _saving = true);
     final nonR = (widget.bureau.inscrits - retraits).clamp(0, widget.bureau.inscrits);
-    // Enregistrer relevé horaire
-    await _svc.soumettreRetraitHoraire(
+
+    final ok1 = await _svc.soumettreRetraitHoraire(
         widget.bureau.id, widget.user.code, _dateSelect, _heureSelect, retraits);
-    // Mettre à jour le cumul journalier
-    await _svc.soumettreRetraitCartes(
+    final ok2 = await _svc.soumettreRetraitCartes(
         widget.bureau.id, widget.user.code, retraits, nonR, null);
+
     setState(() => _saving = false);
+
+    if (!ok1 || !ok2) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Erreur sauvegarde (horaire:$ok1 / cumul:$ok2). Vérifiez connexion.'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5)));
+      return;
+    }
+
     await _load();
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Relevé ${_heureSelect.toString().padLeft(2,'0')}h enregistré ✓'),
