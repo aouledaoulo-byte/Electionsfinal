@@ -1,31 +1,15 @@
 name: election
-description: Application de suivi électoral en temps réel
-publish_to: 'none'
+description: Application Elections 2026
 version: 1.0.0+1
-
 environment:
   sdk: '>=3.0.0 <4.0.0'
-
+  flutter: '>=3.24.0'
 dependencies:
   flutter:
     sdk: flutter
-  supabase_flutter: ^2.3.0
-  shared_preferences: ^2.2.2
-  connectivity_plus: ^5.0.2
-  image_picker: ^1.0.7
-  fl_chart: ^0.66.2
-  intl: ^0.19.0
-  uuid: ^4.3.3
-  cached_network_image: ^3.3.1
-  flutter_spinkit: ^5.2.0
-  percent_indicator: ^4.2.3
-
+  http: ^1.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
-
 flutter:
   uses-material-design: true
-  assets:
-    - assets/images/
