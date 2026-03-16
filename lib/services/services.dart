@@ -35,15 +35,11 @@ class _Supa {
     return [];
   }
 
-  static Future<bool> upsert(String table, Map<String, dynamic> data,
-      {String? onConflict}) async {
+  static Future<bool> upsert(String table, Map<String, dynamic> data) async {
     try {
-      final url = onConflict != null
-          ? '$_url/rest/v1/$table?on_conflict=$onConflict'
-          : '$_url/rest/v1/$table';
       final r = await http
           .post(
-            Uri.parse(url),
+            Uri.parse('$_url/rest/v1/$table'),
             headers: {
               ..._h,
               'Prefer': 'resolution=merge-duplicates,return=minimal'
@@ -118,7 +114,6 @@ class _Supa {
   }
 }
 
-// AuthService
 class AuthService {
   AppUser? _currentUser;
   AppUser? get currentUser => _currentUser;
@@ -171,7 +166,6 @@ class AuthService {
   void logout() => _currentUser = null;
 }
 
-// ElectionService
 class ElectionService {
   Future<List<Bureau>> getBureaux({String? region}) async {
     final q = region != null
@@ -430,7 +424,6 @@ class ElectionService {
         'updated_at': DateTime.now().toIso8601String(),
       });
 
-  // Retraits cartes
   Future<RetraitCartes?> getRetraitCartes(String bureauId) async {
     final data = await _Supa.select('retrait_cartes',
         'bureau_id=eq.$bureauId&order=updated_at.desc');
@@ -464,14 +457,14 @@ class ElectionService {
       'date_saisie': today,
       'valide': false,
       'updated_at': now,
-    }, onConflict: 'bureau_id');
+    });
     await _Supa.upsert('retrait_cartes_historique', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
       'nb_retraits': nbRetraits,
       'nb_non_retraits': nbNonRetraits,
       'date_saisie': today,
-    }, onConflict: 'bureau_id,date_saisie');
+    });
     return ok;
   }
 
@@ -532,7 +525,7 @@ class ElectionService {
       'nb_retraits': nbRetraits,
       'nb_non_retraits': nonRetraits,
       'created_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'bureau_id,date_saisie,heure');
+    });
   }
 
   Future<List<RetraitCartesHoraire>> getRetraitsHorairesBureau(
