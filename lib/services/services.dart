@@ -448,7 +448,8 @@ class ElectionService {
       int nbRetraits, int nbNonRetraits, String? observations) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
     final now = DateTime.now().toIso8601String();
-    final ok = await _Supa.upsert('retrait_cartes', {
+    await _Supa.delete('retrait_cartes', 'bureau_id=eq.$bureauId');
+    final ok = await _Supa.insert('retrait_cartes', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
       'nb_retraits': nbRetraits,
@@ -458,7 +459,9 @@ class ElectionService {
       'valide': false,
       'updated_at': now,
     });
-    await _Supa.upsert('retrait_cartes_historique', {
+    await _Supa.delete('retrait_cartes_historique',
+        'bureau_id=eq.$bureauId&date_saisie=eq.$today');
+    await _Supa.insert('retrait_cartes_historique', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
       'nb_retraits': nbRetraits,
@@ -517,7 +520,9 @@ class ElectionService {
     final dateStr = '${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
     final inscrits = (await getBureau(bureauId))?.inscrits ?? 440;
     final nonRetraits = (inscrits - nbRetraits).clamp(0, inscrits);
-    return _Supa.upsert('retrait_cartes_horaire', {
+    await _Supa.delete('retrait_cartes_horaire',
+        'bureau_id=eq.$bureauId&date_saisie=eq.$dateStr&heure=eq.$heure');
+    return _Supa.insert('retrait_cartes_horaire', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
       'date_saisie': dateStr,
