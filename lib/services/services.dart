@@ -36,7 +36,6 @@ class _Supa {
   }
 
   static Future<bool> upsert(String table, Map<String, dynamic> data) async {
-    try {
       final r = await http
           .post(
             Uri.parse('$_url/rest/v1/$table'),
