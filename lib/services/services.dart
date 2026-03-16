@@ -118,9 +118,7 @@ class _Supa {
   }
 }
 
-// ─────────────────────────────────────────────
 // AuthService
-// ─────────────────────────────────────────────
 class AuthService {
   AppUser? _currentUser;
   AppUser? get currentUser => _currentUser;
@@ -173,9 +171,7 @@ class AuthService {
   void logout() => _currentUser = null;
 }
 
-// ─────────────────────────────────────────────
 // ElectionService
-// ─────────────────────────────────────────────
 class ElectionService {
   Future<List<Bureau>> getBureaux({String? region}) async {
     final q = region != null
@@ -434,7 +430,7 @@ class ElectionService {
         'updated_at': DateTime.now().toIso8601String(),
       });
 
-  // ─── Retraits cartes d'électeur ──────────────────────────
+  // Retraits cartes
   Future<RetraitCartes?> getRetraitCartes(String bureauId) async {
     final data = await _Supa.select('retrait_cartes',
         'bureau_id=eq.$bureauId&order=updated_at.desc');
@@ -523,7 +519,6 @@ class ElectionService {
     }
   }
 
-  // ─── Retraits cartes HORAIRES ─────────────────
   Future<bool> soumettreRetraitHoraire(String bureauId, String agentCode,
       DateTime date, int heure, int nbRetraits) async {
     final dateStr = '${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
