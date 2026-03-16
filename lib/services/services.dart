@@ -35,10 +35,15 @@ class _Supa {
     return [];
   }
 
-  static Future<bool> upsert(String table, Map<String, dynamic> data) async {
+  static Future<bool> upsert(String table, Map<String, dynamic> data,
+      {String? onConflict}) async {
+    try {
+      final url = onConflict != null
+          ? '$_url/rest/v1/$table?on_conflict=$onConflict'
+          : '$_url/rest/v1/$table';
       final r = await http
           .post(
-            Uri.parse('$_url/rest/v1/$table'),
+            Uri.parse(url),
             headers: {
               ..._h,
               'Prefer': 'resolution=merge-duplicates,return=minimal'
@@ -52,7 +57,6 @@ class _Supa {
     }
   }
 
-  // Méthode patch/update robuste avec logging
   static Future<bool> updateById(String table, String id, Map<String, dynamic> data) async {
     try {
       final r = await http
@@ -124,7 +128,6 @@ class AuthService {
   Future<AppUser?> login(String code) async {
     final c = code.trim().toUpperCase();
 
-    // Agent: AGT-001 à AGT-413
     final agentMatch = RegExp(r'^AGT-(\d{3})$').firstMatch(c);
     if (agentMatch != null) {
       final num = int.parse(agentMatch.group(1)!);
@@ -134,13 +137,11 @@ class AuthService {
       }
     }
 
-    // Superviseur national — code par défaut
     if (c == 'SUPNAT-2026') {
       _currentUser = AppUser(code: c, role: AppRoles.superviseurNational);
       return _currentUser;
     }
 
-    // Superviseurs régionaux — code par défaut
     if (superviseurRegionMap.containsKey(c)) {
       _currentUser = AppUser(
           code: c,
@@ -149,7 +150,6 @@ class AuthService {
       return _currentUser;
     }
 
-    // Vérifier les codes personnalisés dans Supabase
     try {
       final sups = await _Supa.select('superviseurs');
       for (final s in sups) {
@@ -177,7 +177,6 @@ class AuthService {
 // ElectionService
 // ─────────────────────────────────────────────
 class ElectionService {
-  // Bureaux
   Future<List<Bureau>> getBureaux({String? region}) async {
     final q = region != null
         ? 'region=eq.$region&order=id.asc'
@@ -186,7 +185,6 @@ class ElectionService {
     if (data.isNotEmpty) {
       return data.map((e) => Bureau.fromMap(e)).toList();
     }
-    // Fallback local si API vide ou inaccessible
     final fallback = kBureauxFallback.where((m) {
       if (region != null) return m['region'] == region;
       return true;
@@ -202,7 +200,6 @@ class ElectionService {
   Future<Bureau?> getBureau(String id) async {
     final data = await _Supa.select('bureaux', 'id=eq.$id');
     if (data.isNotEmpty) return Bureau.fromMap(data.first);
-    // Fallback local
     try {
       final fb = kBureauxFallback.firstWhere((m) => m['id'] == id);
       return Bureau(
@@ -224,7 +221,6 @@ class ElectionService {
   Future<bool> deleteBureau(String id) =>
       _Supa.delete('bureaux', 'id=eq.$id');
 
-  // Relevés horaires
   Future<bool> soumettreTurnout(
           String bureauId, String agentCode, int heure, int votants) =>
       _Supa.upsert('turnout_snapshots', {
@@ -263,12 +259,10 @@ class ElectionService {
           'turnout_snapshots', 'bureau_id=in.($ids)&order=heure.asc');
       return data.map((e) => TurnoutSnapshot.fromMap(e)).toList();
     }
-    final data =
-        await _Supa.select('turnout_snapshots', 'order=heure.asc');
+    final data = await _Supa.select('turnout_snapshots', 'order=heure.asc');
     return data.map((e) => TurnoutSnapshot.fromMap(e)).toList();
   }
 
-  // PV Résultats
   Future<bool> soumettreResultats(PvResult pv) =>
       _Supa.upsert('pv_results', {
         'bureau_id': pv.bureauId,
@@ -291,8 +285,7 @@ class ElectionService {
           'pv_results', 'bureau_id=in.($ids)&order=created_at.desc');
       return data.map((e) => PvResult.fromMap(e)).toList();
     }
-    final data =
-        await _Supa.select('pv_results', 'order=created_at.desc');
+    final data = await _Supa.select('pv_results', 'order=created_at.desc');
     return data.map((e) => PvResult.fromMap(e)).toList();
   }
 
@@ -303,7 +296,6 @@ class ElectionService {
     return PvResult.fromMap(data.first);
   }
 
-  // Superviseur RÉGIONAL valide → statut = valide_reg
   Future<bool> validerPvRegional(String pvId) =>
       _Supa.update('pv_results', {'statut': 'valide_reg'}, 'id=eq.$pvId');
 
@@ -312,7 +304,6 @@ class ElectionService {
       {'statut': 'rejete_reg', 'motif_rejet': motif},
       'id=eq.$pvId');
 
-  // Superviseur NATIONAL valide → statut = publie
   Future<bool> validerPvNational(String pvId) =>
       _Supa.update('pv_results', {'statut': 'publie'}, 'id=eq.$pvId');
 
@@ -321,11 +312,9 @@ class ElectionService {
       {'statut': 'rejete_nat', 'motif_rejet': motif},
       'id=eq.$pvId');
 
-  // Compat
   Future<bool> validerPv(String pvId) => validerPvRegional(pvId);
   Future<bool> rejeterPv(String pvId, String motif) => rejeterPvRegional(pvId, motif);
 
-  // PV publiés (validés par national)
   Future<List<PvResult>> getPvPublies({String? region}) async {
     if (region != null) {
       final bureaux = await getBureaux(region: region);
@@ -339,7 +328,6 @@ class ElectionService {
     return data.map((e) => PvResult.fromMap(e)).toList();
   }
 
-  // Documents
   Future<bool> soumettreDocuments(String bureauId, String agentCode,
           int nbOm, int nbOrdonnances) =>
       _Supa.upsert('documents', {
@@ -360,15 +348,13 @@ class ElectionService {
           'documents', 'bureau_id=in.($ids)&order=created_at.desc');
       return data.map((e) => Document.fromMap(e)).toList();
     }
-    final data =
-        await _Supa.select('documents', 'order=created_at.desc');
+    final data = await _Supa.select('documents', 'order=created_at.desc');
     return data.map((e) => Document.fromMap(e)).toList();
   }
 
   Future<bool> validerDocument(String docId) =>
       _Supa.update('documents', {'valide': true}, 'id=eq.$docId');
 
-  // Messages
   Future<bool> envoyerMessage(
           String expediteur, String destinataire, String contenu) =>
       _Supa.insert('messages', {
@@ -398,7 +384,6 @@ class ElectionService {
   Future<bool> marquerLu(String msgId) =>
       _Supa.update('messages', {'lu': true}, 'id=eq.$msgId');
 
-  // Anomalies
   Future<bool> signalerAnomalie(String bureauId, String agentCode,
           String description, String niveau) =>
       _Supa.insert('anomalies', {
@@ -427,7 +412,6 @@ class ElectionService {
   Future<bool> traiterAnomalie(String anomalieId) =>
       _Supa.update('anomalies', {'traitee': true}, 'id=eq.$anomalieId');
 
-  // Présence agents
   Future<bool> updatePresence(String agentCode, bool enLigne) =>
       _Supa.upsert('agent_presence', {
         'agent_code': agentCode,
@@ -439,7 +423,6 @@ class ElectionService {
     return await _Supa.select('agent_presence');
   }
 
-  // Superviseurs — codes personnalisés
   Future<List<Map<String, dynamic>>> getSuperviseurs() async {
     return await _Supa.select('superviseurs');
   }
@@ -475,7 +458,7 @@ class ElectionService {
   Future<bool> soumettreRetraitCartes(String bureauId, String agentCode,
       int nbRetraits, int nbNonRetraits, String? observations) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    // Upsert dans retrait_cartes — visible immédiatement par le superviseur
+    final now = DateTime.now().toIso8601String();
     final ok = await _Supa.upsert('retrait_cartes', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
@@ -484,22 +467,21 @@ class ElectionService {
       'observations': observations,
       'date_saisie': today,
       'valide': false,
-    });
-    // Historique journalier
+      'updated_at': now,
+    }, onConflict: 'bureau_id');
     await _Supa.upsert('retrait_cartes_historique', {
       'bureau_id': bureauId,
       'agent_code': agentCode,
       'nb_retraits': nbRetraits,
       'nb_non_retraits': nbNonRetraits,
       'date_saisie': today,
-    });
+    }, onConflict: 'bureau_id,date_saisie');
     return ok;
   }
 
   Future<bool> validerRetraitCartes(String retraitId) =>
       _Supa.update('retrait_cartes', {'valide': true}, 'id=eq.$retraitId');
 
-  // Historique retraits avec filtre date
   Future<List<RetraitCartes>> getRetraitsParDate(String date, {String? region}) async {
     if (region != null) {
       final bureaux = await getBureaux(region: region);
@@ -514,7 +496,6 @@ class ElectionService {
     return data.map((e) => RetraitCartes.fromMap(e)).toList();
   }
 
-  // Historique journalier depuis retrait_cartes_horaire (pas besoin de vue SQL)
   Future<List<Map<String, dynamic>>> getStatsSemaineCartes({String? region}) async {
     try {
       if (region != null) {
@@ -529,7 +510,6 @@ class ElectionService {
           'order=date_saisie.asc,heure.asc');
       return data.cast<Map<String, dynamic>>();
     } catch (_) {
-      // Fallback: construire depuis retrait_cartes
       final retraits = await getAllRetraitCartes(region: region);
       return retraits.map((r) => {
         'bureau_id': r.bureauId,
@@ -543,7 +523,7 @@ class ElectionService {
     }
   }
 
-  // ─── Retraits cartes HORAIRES (1h-24h) ─────────────────
+  // ─── Retraits cartes HORAIRES ─────────────────
   Future<bool> soumettreRetraitHoraire(String bureauId, String agentCode,
       DateTime date, int heure, int nbRetraits) async {
     final dateStr = '${date.year}-${date.month.toString().padLeft(2,'0')}-${date.day.toString().padLeft(2,'0')}';
@@ -557,7 +537,7 @@ class ElectionService {
       'nb_retraits': nbRetraits,
       'nb_non_retraits': nonRetraits,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    }, onConflict: 'bureau_id,date_saisie,heure');
   }
 
   Future<List<RetraitCartesHoraire>> getRetraitsHorairesBureau(
