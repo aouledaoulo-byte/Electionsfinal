@@ -7,6 +7,7 @@ import 'dashboard_live.dart';
 import 'agents_screen.dart';
 import 'validation_screen.dart';
 import 'anomalies_screen.dart';
+import 'retrait_import_screen.dart';
 
 class SuperviseurHome extends StatefulWidget {
   const SuperviseurHome({super.key});
@@ -37,7 +38,8 @@ class _SuperviseurHomeState extends State<SuperviseurHome> {
   Future<void> _logout() async {
     await AuthService().logout();
     if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+    Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   final _pages = const [
@@ -46,6 +48,7 @@ class _SuperviseurHomeState extends State<SuperviseurHome> {
     AgentsScreen(),
     ValidationScreen(),
     AnomaliesScreen(),
+    RetraitImportScreen(),
   ];
 
   @override
@@ -68,11 +71,12 @@ class _SuperviseurHomeState extends State<SuperviseurHome> {
         selectedIndex: _page,
         onDestinationSelected: (i) => setState(() => _page = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.bar_chart), label: 'Résultats'),
-          NavigationDestination(icon: Icon(Icons.access_time), label: 'LIVE'),
-          NavigationDestination(icon: Icon(Icons.people), label: 'Agents'),
-          NavigationDestination(icon: Icon(Icons.fact_check), label: 'Validation'),
-          NavigationDestination(icon: Icon(Icons.warning), label: 'Anomalies'),
+          NavigationDestination(icon: Icon(Icons.bar_chart),    label: 'Résultats'),
+          NavigationDestination(icon: Icon(Icons.access_time),  label: 'LIVE'),
+          NavigationDestination(icon: Icon(Icons.people),       label: 'Agents'),
+          NavigationDestination(icon: Icon(Icons.fact_check),   label: 'Validation'),
+          NavigationDestination(icon: Icon(Icons.warning),      label: 'Anomalies'),
+          NavigationDestination(icon: Icon(Icons.credit_card),  label: 'Cartes'),
         ],
       ),
     );
